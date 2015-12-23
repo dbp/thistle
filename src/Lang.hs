@@ -83,7 +83,9 @@ eval _env (EBool b)        = (VBool b, [])
 eval _env (EString t)      = (VString t, [])
 eval env (EList es)        = let vs = map (eval env) es
                              in (VList (map fst vs), concatMap snd vs)
-eval env (EObject fs)      = undefined
+eval env (EObject fs)      =
+  let vs = M.map (eval env) fs
+  in (VObject (M.map fst vs), concat $ M.map snd vs)
 eval (Env env) (EVar v)    =
   case M.lookup v env of
     Nothing -> error $ "Could not find " <> show v <> " in env " <> show env

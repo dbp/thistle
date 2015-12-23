@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import qualified Data.Map   as M
 import           Test.Hspec
 
 import           Lang
@@ -18,6 +19,9 @@ main = hspec $ do
     it "lists" $
       eval emptyEnv (EList [EInt 1, EInt 2])
          `shouldBe` (VList [VInt 1, VInt 2], [])
+    it "objects" $
+      eval emptyEnv (EObject (M.fromList [("k", EInt 2),("l", EInt 3)]))
+         `shouldBe` (VObject (M.fromList [("k", VInt 2),("l", VInt 3)]), [])
   describe "vars, let, lams, and application" $ do
     it "lookup" $
       eval (envFromList [(Var "x", VInt 10)]) (EVar (Var "x"))
@@ -34,6 +38,15 @@ main = hspec $ do
            `shouldBe` (VInt 10, [])
     it "let binding" $
       eval emptyEnv (ELet (Var "x") (EInt 1) (EVar (Var "x")))
+           `shouldBe` (VInt 1, [])
+    it "let shadowing existing vars in env" $
+      eval (envFromList [(Var "x", VInt 10)])
+           (ELet (Var "x") (EInt 1) (EVar (Var "x")))
+           `shouldBe` (VInt 1, [])
+    it "let shadowing let" $
+      eval emptyEnv
+           (ELet (Var "x") (EInt 2)
+                           (ELet (Var "x") (EInt 1) (EVar (Var "x"))))
            `shouldBe` (VInt 1, [])
   describe "if and case" $ do
     it "if true" $
