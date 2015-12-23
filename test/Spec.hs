@@ -18,7 +18,7 @@ main = hspec $ do
     it "lists" $
       eval emptyEnv (EList [EInt 1, EInt 2])
          `shouldBe` (VList [VInt 1, VInt 2], [])
-  describe "vars, lams, and application" $ do
+  describe "vars, let, lams, and application" $ do
     it "lookup" $
       eval (envFromList [(Var "x", VInt 10)]) (EVar (Var "x"))
         `shouldBe` (VInt 10, [])
@@ -32,6 +32,9 @@ main = hspec $ do
       eval (envFromList [(Var "f", VLam emptyEnv [Var "x"] (EVar (Var "x")))])
            (EApp (EVar (Var "f")) [EInt 10])
            `shouldBe` (VInt 10, [])
+    it "let binding" $
+      eval emptyEnv (ELet (Var "x") (EInt 1) (EVar (Var "x")))
+           `shouldBe` (VInt 1, [])
   describe "if and case" $ do
     it "if true" $
       eval emptyEnv (EIf (EBool True) (EInt 1) (EInt 2))

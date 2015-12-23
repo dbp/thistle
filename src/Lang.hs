@@ -29,7 +29,7 @@ data E = EInt Int
        | EIf E E E
        | ECase E E Var Var E
        | EDot E Text
-       | ELet Var E
+       | ELet Var E E
        | EPrim Prim [E]
        | ESource ES
        deriving (Show, Eq)
@@ -115,6 +115,8 @@ eval env (ECase e n h t s) =
                        in (fst v2, snd v <> snd v2)
        _ -> error $ "Non-list in case: " <> show e
 eval env (EDot e f)        = undefined
-eval env (ELet v e)        = undefined
+eval env (ELet var e b)    = let v  = eval env e
+                                 v' = eval (extendEnv env [(var, fst v)]) b
+                             in (fst v', snd v <> snd v')
 eval env (EPrim p es)      = undefined
 eval env (ESource es)      = undefined
