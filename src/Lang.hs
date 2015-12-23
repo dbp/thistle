@@ -98,8 +98,22 @@ eval env (EApp e es)       =
               in (fst res, snd res <> concatMap snd args <> sources)
          else error $ "Wrong number of arguments to lambda " <> show lam <> ". Expected " <> show vs <> ", got" <> show es <> "."
     l -> error $ "Applying a non-lambda " <> show l <> " to arguments " <> show es
-eval env (EIf c t e)       = undefined
-eval env (ECase e n h t s) = undefined
+eval env (EIf c t e)       =
+  let v = eval env c
+  in case fst v of
+       VBool True -> let v2 = eval env t
+                     in (fst v2, snd v <> snd v2)
+       VBool False -> let v2 = eval env e
+                      in (fst v2, snd v <> snd v2)
+       _ -> error $ "Non-boolean in if: " <> show c
+eval env (ECase e n h t s) =
+  let v = eval env e
+  in case fst v of
+       VList [] -> let v2 = eval env n
+                   in (fst v2, snd v <> snd v2)
+       VList (x:xs) -> let v2 = eval (extendEnv env [(h, x),(t, VList xs)]) s
+                       in (fst v2, snd v <> snd v2)
+       _ -> error $ "Non-list in case: " <> show e
 eval env (EDot e f)        = undefined
 eval env (ELet v e)        = undefined
 eval env (EPrim p es)      = undefined
