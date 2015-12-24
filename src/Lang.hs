@@ -15,7 +15,11 @@ data T = TInt
 
 data Var = Var Text deriving (Show, Eq, Ord)
 
-data Prim = PAdd deriving (Show, Eq)
+data Prim = PPlus
+          | PTimes
+          | PMinus
+          | PDivide
+          deriving (Show, Eq)
 
 data E = EInt Int
        | EDouble Double
@@ -89,7 +93,7 @@ eval env (EObject fs)      =
 eval (Env env) (EVar v)    =
   case M.lookup v env of
     Nothing -> error $ "Could not find " <> show v <> " in env " <> show env
-    Just v -> (v, [])
+    Just v' -> (v', [])
 eval env (ELam vs e)       = (VLam env vs e, [])
 eval env (EApp e es)       =
   case eval env e of
@@ -116,9 +120,33 @@ eval env (ECase e n h t s) =
        VList (x:xs) -> let v2 = eval (extendEnv env [(h, x),(t, VList xs)]) s
                        in (fst v2, snd v <> snd v2)
        _ -> error $ "Non-list in case: " <> show e
-eval env (EDot e f)        = undefined
+eval env (EDot e f)        = let v = eval env e
+                             in case fst v of
+                                  VObject fs -> (fs M.! f, snd v)
+                                  _ -> error $ "Non-object in dot: " <> show e
 eval env (ELet var e b)    = let v  = eval env e
                                  v' = eval (extendEnv env [(var, fst v)]) b
                              in (fst v', snd v <> snd v')
-eval env (EPrim p es)      = undefined
+eval env (EPrim p es)      =
+  let vs' = map (eval env) es
+      vs  = map fst vs'
+      ss  = concatMap snd vs'
+  in case p of
+       PPlus -> case vs of
+                  [VInt a, VInt b] -> (VInt (a + b), ss)
+                  [VDouble a, VDouble b] -> (VDouble (a + b), ss)
+                  [VString a, VString b] -> (VString (a <> b), ss)
+                  _ -> error $ "+: didn't get two ints, two doubles, or two strings, got: " <> show vs
+       PTimes -> case vs of
+                   [VInt a, VInt b] -> (VInt (a * b), ss)
+                   [VDouble a, VDouble b] -> (VDouble (a * b), ss)
+                   _ -> error $ "*: didn't get two ints, or two doubles, got: " <> show vs
+       PMinus -> case vs of
+                   [VInt a, VInt b] -> (VInt (a - b), ss)
+                   [VDouble a, VDouble b] -> (VDouble (a - b), ss)
+                   _ -> error $ "-: didn't get two ints, or two doubles, got: " <> show vs
+       PDivide -> case vs of
+                    [VInt a, VInt b] -> (VInt (a `div` b), ss)
+                    [VDouble a, VDouble b] -> (VDouble (a / b), ss)
+                    _ -> error $ "*: didn't get two ints, or two doubles, got: " <> show vs
 eval env (ESource es)      = undefined

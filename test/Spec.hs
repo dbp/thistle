@@ -48,7 +48,7 @@ main = hspec $ do
            (ELet (Var "x") (EInt 2)
                            (ELet (Var "x") (EInt 1) (EVar (Var "x"))))
            `shouldBe` (VInt 1, [])
-  describe "if and case" $ do
+  describe "if, case, and dot" $ do
     it "if true" $
       eval emptyEnv (EIf (EBool True) (EInt 1) (EInt 2))
            `shouldBe` (VInt 1, [])
@@ -67,3 +67,34 @@ main = hspec $ do
     it "case on non-empty, using tail" $
       eval emptyEnv (ECase (EList [EInt 2, EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "t")))
            `shouldBe` (VList [VInt 3] , [])
+    it "dot on object should get field" $
+      eval emptyEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "x")
+           `shouldBe` (VInt 1, [])
+  describe "prims" $ do
+    it "+ on ints" $
+      eval emptyEnv (EPrim PPlus [EInt 1, EInt 1])
+           `shouldBe` (VInt 2, [])
+    it "+ on doubles" $
+      eval emptyEnv (EPrim PPlus [EDouble 1, EDouble 1])
+           `shouldBe` (VDouble 2, [])
+    it "+ on strings" $
+      eval emptyEnv (EPrim PPlus [EString "a", EString "b"])
+           `shouldBe` (VString "ab", [])
+    it "* on ints" $
+      eval emptyEnv (EPrim PTimes [EInt 2, EInt 3])
+           `shouldBe` (VInt 6, [])
+    it "* on doubles" $
+      eval emptyEnv (EPrim PTimes [EDouble 2, EDouble 3])
+           `shouldBe` (VDouble 6, [])
+    it "- on ints" $
+      eval emptyEnv (EPrim PMinus [EInt 2, EInt 3])
+           `shouldBe` (VInt (-1), [])
+    it "- on doubles" $
+      eval emptyEnv (EPrim PMinus [EDouble 2, EDouble 3])
+           `shouldBe` (VDouble (-1), [])
+    it "/ on int" $
+      eval emptyEnv (EPrim PDivide [EInt 4, EInt 2])
+           `shouldBe` (VInt 2, [])
+    it "/ on doubles" $
+      eval emptyEnv (EPrim PDivide [EDouble 3, EDouble 2])
+           `shouldBe` (VDouble 1.5, [])
