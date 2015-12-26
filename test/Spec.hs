@@ -48,6 +48,20 @@ main = hspec $ do
            (ELet (Var "x") (EInt 2)
                            (ELet (Var "x") (EInt 1) (EVar (Var "x"))))
            `shouldBe` (VInt 1, [])
+    it "let should be recursive" $
+       eval emptyEnv
+            (ELet (Var "f") (ELam [Var "x"]
+                                  (ECase (EVar (Var "x"))
+                                         (EInt 0)
+                                         (Var "_")
+                                         (Var "rest")
+                                         (EPrim
+                                            PPlus
+                                            [EInt 1,
+                                             EApp (EVar (Var "f"))
+                                                  [EVar (Var "rest")]])))
+                  (EApp (EVar (Var "f")) [EList [EInt 0, EInt 0, EInt 0]]))
+            `shouldBe` (VInt 3, [])
   describe "if, case, and dot" $ do
     it "if true" $
       eval emptyEnv (EIf (EBool True) (EInt 1) (EInt 2))

@@ -1,3 +1,13 @@
+{-
+
+This module defines a Simple-Typed Lambda Calculus with 'Sources',
+which are values with some meta-data that is propogated through
+computations, such that any resulting value will have all the sources
+that were involved in its result. This is used for out-of-language
+mutation and then recomputation.
+
+-}
+
 module Lang where
 
 import qualified Data.Map    as M
@@ -124,9 +134,14 @@ eval env (EDot e f)        = let v = eval env e
                              in case fst v of
                                   VObject fs -> (fs M.! f, snd v)
                                   _ -> error $ "Non-object in dot: " <> show e
-eval env (ELet var e b)    = let v  = eval env e
-                                 v' = eval (extendEnv env [(var, fst v)]) b
-                             in (fst v', snd v <> snd v')
+eval env (ELet var e b)    =
+  -- NOTE(dbp 2015-12-26): I haven't thought through this recursion
+  -- very well. It _seems_ plausible, because we are using it to
+  -- implement recursion (so anywhere it'll cause divergence,
+  -- presumably the looping should have happened).
+  let v  = eval (extendEnv env [(var, fst v)]) e
+      v' = eval (extendEnv env [(var, fst v)]) b
+  in (fst v', snd v <> snd v')
 eval env (EPrim p es)      =
   let vs' = map (eval env) es
       vs  = map fst vs'
