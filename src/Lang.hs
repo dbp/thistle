@@ -10,6 +10,7 @@ mutation and then recomputation.
 
 module Lang where
 
+import           Data.List   (nub)
 import qualified Data.Map    as M
 import           Data.Monoid ((<>))
 import           Data.Text   (Text)
@@ -45,7 +46,7 @@ data E = EInt Int
        | EDot E Text
        | ELet Var E E
        | EPrim Prim [E]
-       | ESource ES
+       | ESource ES E
        deriving (Show, Eq)
 
 data ES = ES Id T deriving (Show, Eq)
@@ -73,7 +74,6 @@ data V = VInt Int
        | VList [V]
        | VObject (M.Map Text V)
        | VLam Env [Var] E
-       | VSource VS
        deriving (Show, Eq)
 
 data VS = VSBase Id [UserId] V
@@ -88,7 +88,36 @@ data UserId = UserId Int deriving (Show, Eq)
 
 
 tc :: TEnv -> E -> T
-tc = undefined
+tc _ (EInt _)                    = TInt
+tc _ (EDouble _)                 = TDouble
+tc _ (EBool _)                   = TBool
+tc _ (EString _)                 = TString
+tc env (EList es)                =
+  case nub $ map (tc env) es of
+    [t] -> TList t
+    ts -> error $ "tc: Found list with different sorts of elements in it: " <> show ts
+tc env (EObject fs)              = TObject $ M.map (tc env) fs
+tc (TEnv env) (EVar v)           = undefined
+tc env (ELam vs e)               = undefined
+tc env (EApp e es)               = undefined
+tc env (EIf c t e)               = undefined
+tc env (ECase e n h t s)         = undefined
+tc env (EDot e f)                = undefined
+tc env (ELet var e b)            = undefined
+tc env (EPrim p es)              =
+  case p of
+    PPlus ->
+      case map (tc env) es of
+        [TInt, TInt] -> TInt
+        [TInt, o] -> error $ "tc: Can't mix + with TInt and " <> show o
+        [o, TInt] -> error $ "tc: Can't mix + with TInt and " <> show o
+        [TDouble, TDouble] -> TDouble
+        [TDouble, o] -> error $ "tc: Can't mix + with TDouble and " <> show o
+        [o, TDouble] -> error $ "tc: Can't mix + with TDouble and " <> show o
+        [_,_] -> undefined
+        _ -> error $ "tc: Need two arguments to +."
+tc env (ESource (ES id' _t) def) = undefined
+
 
 eval :: Env -> E -> (V, [VS])
 eval _env (EInt n)         = (VInt n, [])
@@ -164,4 +193,6 @@ eval env (EPrim p es)      =
                     [VInt a, VInt b] -> (VInt (a `div` b), ss)
                     [VDouble a, VDouble b] -> (VDouble (a / b), ss)
                     _ -> error $ "*: didn't get two ints, or two doubles, got: " <> show vs
-eval env (ESource es)      = undefined
+eval env (ESource (ES id' _t) def)      =
+  let v = eval env def
+  in (fst v, snd v <> [VSBase id' [] (fst v)])
