@@ -114,8 +114,41 @@ tc env (EPrim p es)              =
         [TDouble, TDouble] -> TDouble
         [TDouble, o] -> error $ "tc: Can't mix + with TDouble and " <> show o
         [o, TDouble] -> error $ "tc: Can't mix + with TDouble and " <> show o
-        [_,_] -> undefined
-        _ -> error $ "tc: Need two arguments to +."
+        [TString, TString] -> TString
+        [TString, o] -> error $ "tc: Can't mix + with TString and " <> show o
+        [o, TString] -> error $ "tc: Can't mix + with TString and " <> show o
+        [a,b] -> error $ "tc: Invalid arguments to +: " <> show a <> " and " <> show b
+        _ -> error "tc: Need two arguments to +."
+    PMinus ->
+      case map (tc env) es of
+        [TInt, TInt] -> TInt
+        [TInt, o] -> error $ "tc: Can't mix - with TInt and " <> show o
+        [o, TInt] -> error $ "tc: Can't mix - with TInt and " <> show o
+        [TDouble, TDouble] -> TDouble
+        [TDouble, o] -> error $ "tc: Can't mix - with TDouble and " <> show o
+        [o, TDouble] -> error $ "tc: Can't mix - with TDouble and " <> show o
+        [a,b] -> error $ "tc: Invalid arguments to -: " <> show a <> " and " <> show b
+        _ -> error "tc: Need two arguments to -."
+    PTimes ->
+      case map (tc env) es of
+        [TInt, TInt] -> TInt
+        [TInt, o] -> error $ "tc: Can't mix * with TInt and " <> show o
+        [o, TInt] -> error $ "tc: Can't mix * with TInt and " <> show o
+        [TDouble, TDouble] -> TDouble
+        [TDouble, o] -> error $ "tc: Can't mix * with TDouble and " <> show o
+        [o, TDouble] -> error $ "tc: Can't mix * with TDouble and " <> show o
+        [a,b] -> error $ "tc: Invalid arguments to *: " <> show a <> " and " <> show b
+        _ -> error "tc: Need two arguments to *."
+    PDivide ->
+      case map (tc env) es of
+        [TInt, TInt] -> TInt
+        [TInt, o] -> error $ "tc: Can't mix / with TInt and " <> show o
+        [o, TInt] -> error $ "tc: Can't mix / with TInt and " <> show o
+        [TDouble, TDouble] -> TDouble
+        [TDouble, o] -> error $ "tc: Can't mix / with TDouble and " <> show o
+        [o, TDouble] -> error $ "tc: Can't mix / with TDouble and " <> show o
+        [a,b] -> error $ "tc: Invalid arguments to /: " <> show a <> " and " <> show b
+        _ -> error "tc: Need two arguments to /."
 tc env (ESource (ES id' _t) def) = undefined
 
 

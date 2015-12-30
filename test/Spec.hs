@@ -29,10 +29,10 @@ main = hspec $ do
         eval (envFromList [(Var "x", VInt 10)]) (EVar (Var "x"))
           `shouldBe` (VInt 10, [])
       it "applying one argument functions" $
-        eval emptyEnv (EApp (ELam [Var "x"] (EVar (Var "x"))) [EInt 10])
+        eval emptyEnv (EApp (ELam [(Var "x", TInt)] (EVar (Var "x"))) [EInt 10])
              `shouldBe` (VInt 10, [])
       it "applying two argument functions" $
-        eval emptyEnv (EApp (ELam [Var "x", Var "y"] (EVar (Var "x"))) [EInt 10, EInt 20])
+        eval emptyEnv (EApp (ELam [(Var "x", TInt), (Var "y", TInt)] (EVar (Var "x"))) [EInt 10, EInt 20])
              `shouldBe` (VInt 10, [])
       it "applying closures" $
         eval (envFromList [(Var "f", VLam emptyEnv [Var "x"] (EVar (Var "x")))])
@@ -163,4 +163,59 @@ main = hspec $ do
              `shouldBe` TDouble
         it "doesn't work on bools and doubles" $
           evaluate (tc emptyTEnv (EPrim PPlus [EBool True, EDouble 10]))
+                   `shouldThrow` anyErrorCall
+      describe "+ on strings" $ do
+        it "works" $
+             tc emptyTEnv (EPrim PPlus [EString "a", EString "b"])
+                `shouldBe` TString
+        it "doesn't work on strings and ints" $
+          evaluate (tc emptyTEnv (EPrim PPlus [EString "a", EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "- on ints" $ do
+        it "works" $
+           tc emptyTEnv (EPrim PMinus [EInt 1, EInt 10])
+              `shouldBe` TInt
+        it "doesn't work on bools and ints" $
+          evaluate (tc emptyTEnv (EPrim PMinus [EBool True, EInt 10]))
+                   `shouldThrow` anyErrorCall
+        it "- on less than two arguments" $
+           evaluate (tc emptyTEnv (EPrim PMinus [EInt 1]))
+                    `shouldThrow` anyErrorCall
+        it "- on more than two arguments" $
+           evaluate (tc emptyTEnv (EPrim PMinus [EInt 1, EInt 1, EInt 1]))
+                    `shouldThrow` anyErrorCall
+      describe "- on doubles" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PMinus [EDouble 1, EDouble 10])
+             `shouldBe` TDouble
+        it "doesn't work on doubles and ints" $
+          evaluate (tc emptyTEnv (EPrim PMinus [EDouble 1, EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "* on ints" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PTimes [EInt 1, EInt 10])
+             `shouldBe` TInt
+        it "doesn't work on doubles and ints" $
+          evaluate (tc emptyTEnv (EPrim PTimes [EDouble 1, EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "* on doubles" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PTimes [EDouble 1, EDouble 10])
+             `shouldBe` TDouble
+        it "doesn't work on doubles and ints" $
+          evaluate (tc emptyTEnv (EPrim PTimes [EDouble 1, EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "/ on ints" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PDivide [EInt 1, EInt 10])
+             `shouldBe` TInt
+        it "doesn't work on doubles and ints" $
+          evaluate (tc emptyTEnv (EPrim PDivide [EDouble 1, EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "/ on doubles" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PDivide [EDouble 1, EDouble 10])
+             `shouldBe` TDouble
+        it "doesn't work on doubles and ints" $
+          evaluate (tc emptyTEnv (EPrim PDivide [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
