@@ -52,7 +52,7 @@ main = hspec $ do
              `shouldBe` (VInt 1, [])
       it "let should be recursive" $
          eval emptyEnv
-              (ELet (Var "f") (ELam [Var "x"]
+              (ELet (Var "f") (ELam [(Var "x", TList TInt)]
                                     (ECase (EVar (Var "x"))
                                            (EInt 0)
                                            (Var "_")
@@ -219,3 +219,36 @@ main = hspec $ do
         it "doesn't work on doubles and ints" $
           evaluate (tc emptyTEnv (EPrim PDivide [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
+    describe "vars, let, lam, and application" $ do
+      it "(x:int) { x } typechecks" $
+        tc emptyTEnv (ELam [(Var "x", TInt)] (EVar (Var "x")))
+           `shouldBe` TLam [TInt] TInt
+      it "(x:int) { x x } fails" $
+        evaluate (tc emptyTEnv (ELam [(Var "x", TInt)] (EApp (EVar (Var "x"))  [(EVar (Var "x"))])))
+                 `shouldThrow` anyErrorCall
+      it "(x:int) { 10 } typechecks" $
+        tc emptyTEnv (ELam [(Var "x", TInt)] (EVar (Var "x")))
+           `shouldBe` TLam [TInt] TInt
+      it "(f : int -> int) { f 10 } typechecks" $
+        tc emptyTEnv (ELam [(Var "f", TLam [TInt] TInt)] (EApp (EVar (Var "f")) [EInt 10]))
+           `shouldBe` TLam [TLam [TInt] TInt] TInt
+      it "(x:int y:bool) { y } typechecks" $
+        tc emptyTEnv (ELam [(Var "x", TInt),(Var "y", TBool)]
+                           (EVar (Var "y")))
+           `shouldBe` TLam [TInt, TBool] TBool
+      it "(f : int -> bool) { f true } fails" $
+        evaluate (tc emptyTEnv (ELam [(Var "f", TLam [TInt] TBool)] (EApp (EVar (Var "f")) [EBool True])))
+                   `shouldThrow` anyErrorCall
+    describe "if and case" $ do
+      it "if true 1 2 typechecks" $
+        tc emptyTEnv (EIf (EBool True) (EInt 1) (EInt 2))
+           `shouldBe` TInt
+      it "if false 1 true fails" $
+        evaluate (tc emptyTEnv (EIf (EBool False) (EInt 1) (EBool True)))
+                 `shouldThrow` anyErrorCall
+      it "if 1 1 1 fails" $
+        evaluate (tc emptyTEnv (EIf (EInt 1) (EInt 1) (EInt 1)))
+                 `shouldThrow` anyErrorCall
+      it "if true (x : int) { 10 } (y : int) { 20 } typechecks" $
+        tc emptyTEnv (EIf (EBool True) (ELam [(Var "x", TInt)] (EInt 10)) (ELam [(Var "y", TInt)] (EInt 20)))
+           `shouldBe` TLam [TInt] TInt

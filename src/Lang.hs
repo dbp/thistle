@@ -1,10 +1,11 @@
 {-
 
-This module defines a Simple-Typed Lambda Calculus with 'Sources',
-which are values with some meta-data that is propogated through
-computations, such that any resulting value will have all the sources
-that were involved in its result. This is used for out-of-language
-mutation and then recomputation.
+This module defines a Simple-Typed Lambda Calculus with recursive
+bindings (and thus non-termination) and 'Sources', which are values
+with some meta-data that is propogated through computations, such that
+any resulting value will have all the sources that were involved in
+its result. This is used for out-of-language mutation and then
+recomputation.
 
 -}
 
@@ -19,9 +20,9 @@ data T = TInt
        | TDouble
        | TBool
        | TString
-       | TList T
-       | TObject (M.Map Text T)
-       | TLam [T] T
+       | TList !T
+       | TObject !(M.Map Text T)
+       | TLam ![T] !T
        deriving (Show, Eq)
 
 data Var = Var Text deriving (Show, Eq, Ord)
@@ -39,7 +40,7 @@ data E = EInt Int
        | EList [E]
        | EObject (M.Map Text E)
        | EVar Var
-       | ELam [Var] E
+       | ELam [(Var, T)] E
        | EApp E [E]
        | EIf E E E
        | ECase E E Var Var E
@@ -66,6 +67,9 @@ data TEnv = TEnv (M.Map Var T) deriving (Show, Eq)
 
 emptyTEnv :: TEnv
 emptyTEnv = TEnv M.empty
+
+extendTEnv :: TEnv -> [(Var, T)] -> TEnv
+extendTEnv (TEnv e) vs = TEnv (M.union (M.fromList vs) e)
 
 data V = VInt Int
        | VDouble Double
@@ -97,10 +101,25 @@ tc env (EList es)                =
     [t] -> TList t
     ts -> error $ "tc: Found list with different sorts of elements in it: " <> show ts
 tc env (EObject fs)              = TObject $ M.map (tc env) fs
-tc (TEnv env) (EVar v)           = undefined
-tc env (ELam vs e)               = undefined
-tc env (EApp e es)               = undefined
-tc env (EIf c t e)               = undefined
+tc (TEnv env) (EVar v)           =
+  case M.lookup v env of
+    Nothing -> error $ "tc: Unbound identifier " <> show v
+    Just t -> t
+tc env (ELam vs e)               =
+  TLam (map snd vs) (tc (extendTEnv env vs) e)
+tc env (EApp e es)               = case tc env e of
+                                     TLam ts t -> let as = map (tc env) es in
+                                                      if as == ts
+                                                         then t
+                                                         else error $ "tc: Arguments did not match types expected by lambda. Expected " <> show ts <> " but got " <> show as
+                                     t -> error $ "tc: Got non-function type in application: " <> show t
+tc env (EIf c t e)               = case tc env c of
+                                     TBool -> let tt = tc env t
+                                                  te = tc env e
+                                              in if tt == te
+                                                    then tt
+                                                    else error $ "tc: If had different types in the then and else branches: " <> show tt <> " and " <> show te
+                                     t -> error $ "tc: Got non-boolean in If test: " <> show t
 tc env (ECase e n h t s)         = undefined
 tc env (EDot e f)                = undefined
 tc env (ELet var e b)            = undefined
@@ -166,7 +185,7 @@ eval (Env env) (EVar v)    =
   case M.lookup v env of
     Nothing -> error $ "Could not find " <> show v <> " in env " <> show env
     Just v' -> (v', [])
-eval env (ELam vs e)       = (VLam env vs e, [])
+eval env (ELam vs e)     = (VLam env (map fst vs) e, [])
 eval env (EApp e es)       =
   case eval env e of
     (lam@(VLam venv vs body), sources) ->
