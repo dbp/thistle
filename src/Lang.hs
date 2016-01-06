@@ -37,7 +37,7 @@ data E = EInt Int
        | EDouble Double
        | EBool Bool
        | EString Text
-       | EList [E]
+       | EList T [E]
        | EObject (M.Map Text E)
        | EVar Var
        | ELam [(Var, T)] E
@@ -96,9 +96,11 @@ tc _ (EInt _)                    = TInt
 tc _ (EDouble _)                 = TDouble
 tc _ (EBool _)                   = TBool
 tc _ (EString _)                 = TString
-tc env (EList es)                =
+tc env (EList t es)                =
   case nub $ map (tc env) es of
-    [t] -> TList t
+    [] -> TList t
+    [t'] | t == t' -> TList t
+    [t']  -> error $ "tc: List elements don't have type of annotation. Annotation was " <> show t <> " but elements have type " <> show t'
     ts -> error $ "tc: Found list with different sorts of elements in it: " <> show ts
 tc env (EObject fs)              = TObject $ M.map (tc env) fs
 tc (TEnv env) (EVar v)           =
@@ -118,9 +120,17 @@ tc env (EIf c t e)               = case tc env c of
                                                   te = tc env e
                                               in if tt == te
                                                     then tt
-                                                    else error $ "tc: If had different types in the then and else branches: " <> show tt <> " and " <> show te
-                                     t -> error $ "tc: Got non-boolean in If test: " <> show t
-tc env (ECase e n h t s)         = undefined
+                                                    else error $ "tc: if had different types in the then and else branches: " <> show tt <> " and " <> show te
+                                     t -> error $ "tc: Got non-boolean in if test: " <> show t
+tc env (ECase e n h t s)         = let v = tc env e
+                                   in case v of
+                                        TList te ->
+                                          let tnull = tc env n
+                                              tcons = tc (extendTEnv env [(h, te), (t, TList te)]) s
+                                          in if tnull == tcons
+                                                then tnull
+                                                else error $ "tc: null and cons branch of case did not have the same type: " <> show tnull <> " and " <> show tcons
+                                        twrong -> error $ "tc: Got non-list in case: " <> show twrong
 tc env (EDot e f)                = undefined
 tc env (ELet var e b)            = undefined
 tc env (EPrim p es)              =
@@ -176,8 +186,8 @@ eval _env (EInt n)         = (VInt n, [])
 eval _env (EDouble d)      = (VDouble d, [])
 eval _env (EBool b)        = (VBool b, [])
 eval _env (EString t)      = (VString t, [])
-eval env (EList es)        = let vs = map (eval env) es
-                             in (VList (map fst vs), concatMap snd vs)
+eval env (EList _ es)        = let vs = map (eval env) es
+                               in (VList (map fst vs), concatMap snd vs)
 eval env (EObject fs)      =
   let vs = M.map (eval env) fs
   in (VObject (M.map fst vs), concat $ M.map snd vs)

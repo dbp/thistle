@@ -19,7 +19,7 @@ main = hspec $ do
       it "bools" $
         eval emptyEnv (EBool True) `shouldBe` (VBool True, [])
       it "lists" $
-        eval emptyEnv (EList [EInt 1, EInt 2])
+        eval emptyEnv (EList TInt [EInt 1, EInt 2])
            `shouldBe` (VList [VInt 1, VInt 2], [])
       it "objects" $
         eval emptyEnv (EObject (M.fromList [("k", EInt 2),("l", EInt 3)]))
@@ -62,7 +62,7 @@ main = hspec $ do
                                               [EInt 1,
                                                EApp (EVar (Var "f"))
                                                     [EVar (Var "rest")]])))
-                    (EApp (EVar (Var "f")) [EList [EInt 0, EInt 0, EInt 0]]))
+                    (EApp (EVar (Var "f")) [EList TInt [EInt 0, EInt 0, EInt 0]]))
               `shouldBe` (VInt 3, [])
     describe "if, case, and dot" $ do
       it "if true" $
@@ -72,16 +72,16 @@ main = hspec $ do
         eval emptyEnv (EIf (EBool False) (EInt 1) (EInt 2))
              `shouldBe` (VInt 2, [])
       it "case on empty lists" $
-        eval emptyEnv (ECase (EList []) (EInt 1) (Var "h") (Var "t") (EInt 2))
+        eval emptyEnv (ECase (EList TInt []) (EInt 1) (Var "h") (Var "t") (EInt 2))
              `shouldBe` (VInt 1, [])
       it "case on non-empty list" $
-        eval emptyEnv (ECase (EList [EInt 1]) (EInt 1) (Var "h") (Var "t") (EInt 2))
+        eval emptyEnv (ECase (EList TInt [EInt 1]) (EInt 1) (Var "h") (Var "t") (EInt 2))
              `shouldBe` (VInt 2, [])
       it "case on non-empty, using head" $
-        eval emptyEnv (ECase (EList [EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "h")))
+        eval emptyEnv (ECase (EList TInt [EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "h")))
              `shouldBe` (VInt 3, [])
       it "case on non-empty, using tail" $
-        eval emptyEnv (ECase (EList [EInt 2, EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "t")))
+        eval emptyEnv (ECase (EList TInt [EInt 2, EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "t")))
              `shouldBe` (VList [VInt 3] , [])
       it "dot on object should get field" $
         eval emptyEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "x")
@@ -129,10 +129,10 @@ main = hspec $ do
       it "bools" $ tc emptyTEnv (EBool True) `shouldBe` TBool
       it "doubles" $ tc emptyTEnv (EDouble 1) `shouldBe` TDouble
       it "lists" $
-        tc emptyTEnv (EList [EInt 1, EInt 2])
+        tc emptyTEnv (EList TInt [EInt 1, EInt 2])
            `shouldBe` TList TInt
       it "lists should not be hererogeneous" $
-         evaluate (tc emptyTEnv (EList [EInt 1, EDouble 2]))
+         evaluate (tc emptyTEnv (EList TInt [EInt 1, EDouble 2]))
                   `shouldThrow` anyErrorCall
       it "objects" $
         tc emptyTEnv (EObject (M.fromList [("k", EInt 2),("l", EInt 3)]))
@@ -252,3 +252,18 @@ main = hspec $ do
       it "if true (x : int) { 10 } (y : int) { 20 } typechecks" $
         tc emptyTEnv (EIf (EBool True) (ELam [(Var "x", TInt)] (EInt 10)) (ELam [(Var "y", TInt)] (EInt 20)))
            `shouldBe` TLam [TInt] TInt
+      it "case [:int] { 1 } (_ _) { 2 } typechecks" $
+        tc emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "_") (EInt 2))
+           `shouldBe` TInt
+      it "case [:int] { true } (_ _) { 2 } fails" $
+        evaluate (tc emptyTEnv (ECase (EList TInt []) (EBool True) (Var "_") (Var "_") (EInt 2)))
+                 `shouldThrow` anyErrorCall
+      it "case [:int] { true } (h _) { h } fails" $
+        evaluate (tc emptyTEnv (ECase (EList TInt []) (EBool True) (Var "h") (Var "_") (EVar (Var "h"))))
+                 `shouldThrow` anyErrorCall
+      it "case [:int] { 1 } (h _) { h } typechecks" $
+        tc emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "h") (Var "_") (EVar (Var "h")))
+                                                                                       `shouldBe` TInt
+      it "case [:int] { 1 } (_ t) { t } fails" $
+        evaluate (tc emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "t") (EVar (Var "t"))))
+                 `shouldThrow` anyErrorCall
