@@ -85,7 +85,7 @@ data VS = VSBase Id [UserId] V
         | VSObject Id [UserId] (M.Map Text VS)
         deriving (Show, Eq)
 
-data Id = Id Int deriving (Show, Eq)
+data Id = Id Text deriving (Show, Eq)
 
 data UserId = UserId Int deriving (Show, Eq)
 
@@ -121,7 +121,7 @@ tc env (EIf c t e)               = case tc env c of
                                               in if tt == te
                                                     then tt
                                                     else error $ "tc: if had different types in the then and else branches: " <> show tt <> " and " <> show te
-                                     t -> error $ "tc: Got non-boolean in if test: " <> show t
+                                     t' -> error $ "tc: Got non-boolean in if test: " <> show t'
 tc env (ECase e n h t s)         = let v = tc env e
                                    in case v of
                                         TList te ->
@@ -131,8 +131,15 @@ tc env (ECase e n h t s)         = let v = tc env e
                                                 then tnull
                                                 else error $ "tc: null and cons branch of case did not have the same type: " <> show tnull <> " and " <> show tcons
                                         twrong -> error $ "tc: Got non-list in case: " <> show twrong
-tc env (EDot e f)                = undefined
-tc env (ELet var e b)            = undefined
+tc env (EDot e f)                =
+  case tc env e of
+    to@(TObject fs) ->
+      case M.lookup f fs of
+        Just t -> t
+        Nothing -> error $ "tc: field " <> show f <> " not found on object: " <> show to
+    t -> error $ "tc: got non-object in dot: " <> show t
+tc env (ELet var e b)            = let t = tc env e
+                                   in tc (extendTEnv env [(var, t)]) b
 tc env (EPrim p es)              =
   case p of
     PPlus ->
@@ -178,7 +185,11 @@ tc env (EPrim p es)              =
         [o, TDouble] -> error $ "tc: Can't mix / with TDouble and " <> show o
         [a,b] -> error $ "tc: Invalid arguments to /: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to /."
-tc env (ESource (ES id' _t) def) = undefined
+tc env (ESource (ES _id t) def) =
+  let tv = tc env def
+  in if tv == t
+        then t
+        else error $ "tc: Default value of source doesn't have type of source. Expected " <> show t <> " but got " <> show tv
 
 
 eval :: Env -> E -> (V, [VS])

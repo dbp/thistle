@@ -116,12 +116,12 @@ main = hspec $ do
              `shouldBe` (VDouble 1.5, [])
     describe "sources" $ do
       it "sources should produce their default values" $
-        eval emptyEnv (ESource (ES (Id 1) TInt) (EInt 10))
-             `shouldBe` (VInt 10, [VSBase (Id 1) [] (VInt 10)])
+        eval emptyEnv (ESource (ES (Id "1") TInt) (EInt 10))
+             `shouldBe` (VInt 10, [VSBase (Id "1") [] (VInt 10)])
       it "should be able to add sources of ints" $
         eval emptyEnv (EPrim PPlus [EInt 1
-                                   ,ESource (ES (Id 1) TInt) (EInt 10)])
-             `shouldBe` (VInt 11, [VSBase (Id 1) [] (VInt 10)])
+                                   ,ESource (ES (Id "1") TInt) (EInt 10)])
+             `shouldBe` (VInt 11, [VSBase (Id "1") [] (VInt 10)])
   describe "tc" $ do
     describe "constants" $ do
       it "ints" $ tc emptyTEnv (EInt 1) `shouldBe` TInt
@@ -239,7 +239,13 @@ main = hspec $ do
       it "(f : int -> bool) { f true } fails" $
         evaluate (tc emptyTEnv (ELam [(Var "f", TLam [TInt] TBool)] (EApp (EVar (Var "f")) [EBool True])))
                    `shouldThrow` anyErrorCall
-    describe "if and case" $ do
+      it "x = 2 in x" $
+        tc emptyTEnv (ELet (Var "x") (EInt 2) (EVar (Var "x")))
+           `shouldBe` TInt
+      it "x = 2 in x = true in x" $
+        tc emptyTEnv (ELet (Var "x") (EInt 2) (ELet (Var "x") (EBool True) (EVar (Var "x"))))
+           `shouldBe` TBool
+    describe "if, dot, and case" $ do
       it "if true 1 2 typechecks" $
         tc emptyTEnv (EIf (EBool True) (EInt 1) (EInt 2))
            `shouldBe` TInt
@@ -252,6 +258,12 @@ main = hspec $ do
       it "if true (x : int) { 10 } (y : int) { 20 } typechecks" $
         tc emptyTEnv (EIf (EBool True) (ELam [(Var "x", TInt)] (EInt 10)) (ELam [(Var "y", TInt)] (EInt 20)))
            `shouldBe` TLam [TInt] TInt
+      it "{x: 1}.x typechecks" $
+         tc emptyTEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "x")
+            `shouldBe` TInt
+      it "{x: 1}.y fails" $
+         evaluate (tc emptyTEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "y"))
+                  `shouldThrow` anyErrorCall
       it "case [:int] { 1 } (_ _) { 2 } typechecks" $
         tc emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "_") (EInt 2))
            `shouldBe` TInt
@@ -266,4 +278,11 @@ main = hspec $ do
                                                                                        `shouldBe` TInt
       it "case [:int] { 1 } (_ t) { t } fails" $
         evaluate (tc emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "t") (EVar (Var "t"))))
+                 `shouldThrow` anyErrorCall
+    describe "sources" $ do
+      it "source<foo;TInt;1> typechecks" $
+        tc emptyTEnv (ESource (ES (Id "foo") TInt) (EInt 1))
+           `shouldBe` TInt
+      it "source<foo;TInt;\"too\"> fails" $
+        evaluate (tc emptyTEnv (ESource (ES (Id "foo") TInt) (EString "too")))
                  `shouldThrow` anyErrorCall
