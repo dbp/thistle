@@ -13,6 +13,7 @@ module Lang where
 
 import           Data.List   (nub)
 import qualified Data.Map    as M
+import           Data.Maybe  (fromMaybe)
 import           Data.Monoid ((<>))
 import           Data.Text   (Text)
 
@@ -103,10 +104,7 @@ tc env (EList t es)                =
     [t']  -> error $ "tc: List elements don't have type of annotation. Annotation was " <> show t <> " but elements have type " <> show t'
     ts -> error $ "tc: Found list with different sorts of elements in it: " <> show ts
 tc env (EObject fs)              = TObject $ M.map (tc env) fs
-tc (TEnv env) (EVar v)           =
-  case M.lookup v env of
-    Nothing -> error $ "tc: Unbound identifier " <> show v
-    Just t -> t
+tc (TEnv env) (EVar v)           = fromMaybe (error $ "tc: Unbound identifier " <> show v) (M.lookup v env)
 tc env (ELam vs e)               =
   TLam (map snd vs) (tc (extendTEnv env vs) e)
 tc env (EApp e es)               = case tc env e of
@@ -186,11 +184,17 @@ tc env (EPrim p es)              =
         [a,b] -> error $ "tc: Invalid arguments to /: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to /."
 tc env (ESource (ES _id t) def) =
-  let tv = tc env def
+  if haslam t then error $ "tc: Sources cannot contain functions. Found one in type: " <> show t
+  else let tv = tc env def
   in if tv == t
         then t
         else error $ "tc: Default value of source doesn't have type of source. Expected " <> show t <> " but got " <> show tv
 
+haslam :: T -> Bool
+haslam (TLam _ _) = True
+haslam (TList t) = haslam t
+haslam (TObject m) = any haslam (M.elems m)
+haslam _ = False
 
 eval :: Env -> E -> (V, [VS])
 eval _env (EInt n)         = (VInt n, [])

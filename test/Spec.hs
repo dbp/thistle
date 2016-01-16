@@ -280,9 +280,18 @@ main = hspec $ do
         evaluate (tc emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "t") (EVar (Var "t"))))
                  `shouldThrow` anyErrorCall
     describe "sources" $ do
-      it "source<foo;TInt;1> typechecks" $
+      it "source<foo;int;1> typechecks" $
         tc emptyTEnv (ESource (ES (Id "foo") TInt) (EInt 1))
            `shouldBe` TInt
-      it "source<foo;TInt;\"too\"> fails" $
+      it "source<foo;[int];[1,2,3 : int]> typechecks" $
+        tc emptyTEnv (ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3]))
+           `shouldBe` TList TInt
+      it "source<foo;int;\"too\"> fails" $
         evaluate (tc emptyTEnv (ESource (ES (Id "foo") TInt) (EString "too")))
+                 `shouldThrow` anyErrorCall
+      it "source<foo; int -> int; (x : int) { x }> fails" $
+        evaluate (tc emptyTEnv (ESource (ES (Id "foo") (TLam [TInt] TInt)) (ELam [(Var "x", TInt)] (EVar (Var "x")))))
+                 `shouldThrow` anyErrorCall
+      it "source<foo; { x : int -> int }; {x: (y : int) { y } }> fails" $
+        evaluate (tc emptyTEnv (ESource (ES (Id "foo") (TObject (M.fromList [("x", TLam [TInt] TInt)]))) (EObject (M.fromList [("x", ELam [(Var "x", TInt)] (EVar (Var "x")))]))))
                  `shouldThrow` anyErrorCall
