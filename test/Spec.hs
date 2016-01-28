@@ -2,9 +2,12 @@
 
 import           Control.Exception (evaluate)
 import qualified Data.Map          as M
+import qualified Data.Text         as T
 import           Test.Hspec
 
 import           Lang
+import           Lexer
+import qualified ParseE
 
 main :: IO ()
 main = hspec $ do
@@ -295,3 +298,43 @@ main = hspec $ do
       it "source<foo; { x : int -> int }; {x: (y : int) { y } }> fails" $
         evaluate (tc emptyTEnv (ESource (ES (Id "foo") (TObject (M.fromList [("x", TLam [TInt] TInt)]))) (EObject (M.fromList [("x", ELam [(Var "x", TInt)] (EVar (Var "x")))]))))
                  `shouldThrow` anyErrorCall
+  describe "parsing expr" $ do
+    let shouldParse s v = it s $ ParseE.parse (lexer s) `shouldBe` v
+    "1" `shouldParse` EInt 1
+    "012345" `shouldParse` EInt 12345
+    "1.0" `shouldParse` EDouble 1.0
+    "100.05" `shouldParse` EDouble 100.05
+    "true" `shouldParse` EBool True
+    "false" `shouldParse` EBool False
+    "\"blah\"" `shouldParse` EString "blah"
+    "\"true\"" `shouldParse` EString "true"
+    "[:int]" `shouldParse` EList TInt []
+    "[ : int]" `shouldParse` EList TInt []
+    "[0 : int ]" `shouldParse` EList TInt [EInt 0]
+    "[0, 1 ,2:int]" `shouldParse` EList TInt [EInt 0
+                                           ,EInt 1
+                                           ,EInt 2]
+    "[[:int]:[int]]" `shouldParse` EList (TList TInt) [EList TInt []]
+    "x" `shouldParse` EVar (Var "x")
+    "x1_z" `shouldParse` EVar (Var "x1_z")
+    "x1-z" `shouldParse` EVar (Var "x1-z")
+    "a'" `shouldParse` EVar (Var "a'")
+    "(x : int) { x }" `shouldParse` ELam [(Var "x", TInt)]
+                                         (EVar (Var "x"))
+    "(x : int, y : string) { x }" `shouldParse` ELam [(Var "x", TInt), (Var "y", TString)]
+                                                  (EVar (Var "x"))
+    "() { 1 }" `shouldParse` ELam [] (EInt 1)
+    "x()" `shouldParse` EApp (EVar (Var "x")) []
+    "x(1,2,3)" `shouldParse` EApp (EVar (Var "x")) [EInt 1
+                                                   ,EInt 2
+                                                   ,EInt 3]
+    "() {1} ()" `shouldParse` EApp (ELam [] (EInt 1)) []
+    "(x : -> int) {x()} (() { 1})" `shouldParse` EApp (ELam [(Var "x", TLam [] TInt )] (EApp (EVar (Var "x")) [])) [ELam [] (EInt 1)]
+  -- describe "parsing typ" $ do
+  --   let shouldParse s v = it (T.unpack s) $ parseT s `shouldBe` Right v
+  --   "int" `shouldParse` TInt
+  --   "string" `shouldParse` TString
+  --   "[int]" `shouldParse` TList TInt
+  --   "int -> int" `shouldParse` TLam [TInt] TInt
+  --   "-> int" `shouldParse` TLam [] TInt
+  --   "int, string -> int" `shouldParse` TLam [TInt, TString] TInt
