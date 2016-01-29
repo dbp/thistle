@@ -11,6 +11,9 @@ import Lang
 %name parse
 %tokentype { Token }
 %error { parseError }
+%right in
+%left '+' '-'
+%left '*' '/'
 
 %token
       int             { TokenInt $$ }
@@ -34,6 +37,7 @@ import Lang
       '.'             { TokenDot }
       ','             { TokenComma }
       ':'             { TokenColon }
+      ';'             { TokenSemiColon }
       '('             { TokenPO }
       ')'             { TokenPC }
       '['             { TokenSBO }
@@ -65,6 +69,12 @@ Exp   : int  { EInt $1 }
       | case Exp '{' Exp '}' '(' var var ')' '{' Exp '}' { ECase $2 $4 (Var $7) (Var $8) $11 }
       | Exp '.' var { EDot $1 $3 }
       | var '=' Exp in Exp { ELet (Var $1) $3 $5 }
+      | Exp '+' Exp { EPrim PPlus [$1, $3] }
+      | Exp '-' Exp { EPrim PMinus [$1, $3] }
+      | Exp '*' Exp { EPrim PTimes [$1, $3] }
+      | Exp '/' Exp { EPrim PDivide [$1, $3] }
+      | '(' Exp ')' { $2 }
+      | source '<' var ';' Type ';' Exp '>' { ESource (ES (Id $3) $5) $7 }
 
 ListElems : Exp ',' ListElems { $1:$3 }
           | Exp { [$1] }

@@ -14,6 +14,7 @@ data Token
       | TokenVar Text
       | TokenDot
       | TokenColon
+      | TokenSemiColon
       | TokenComma
       | TokenPO
       | TokenPC
@@ -50,6 +51,7 @@ lexer (',':cs) = TokenComma : lexer cs
 lexer ('=':cs) = TokenEqual : lexer cs
 lexer ('-':'>':cs) = TokenArrow : lexer cs
 lexer (':':cs) = TokenColon : lexer cs
+lexer (';':cs) = TokenSemiColon : lexer cs
 lexer ('(':cs) = TokenPO : lexer cs
 lexer (')':cs) = TokenPC : lexer cs
 lexer ('[':cs) = TokenSBO : lexer cs

@@ -341,6 +341,18 @@ main = hspec $ do
     "{y: 1}.y" `shouldParse` (EDot (EObject (M.fromList [("y", EInt 1)])) "y")
     "x = 2 in x" `shouldParse` (ELet (Var "x") (EInt 2) (EVar (Var "x")))
     "x = y = 0 in 10 in x" `shouldParse` (ELet (Var "x") (ELet (Var "y") (EInt 0) (EInt 10)) (EVar (Var "x")))
+    "1 + 2" `shouldParse` (EPrim PPlus [EInt 1, EInt 2])
+    "1 + 2 + 3" `shouldParse` (EPrim PPlus [EPrim PPlus [EInt 1, EInt 2], EInt 3])
+    "1 + (2 + 3)" `shouldParse` (EPrim PPlus [EInt 1, EPrim PPlus [EInt 2, EInt 3]])
+    "1 * 2" `shouldParse` (EPrim PTimes [EInt 1, EInt 2])
+    "1 - 2" `shouldParse` (EPrim PMinus [EInt 1, EInt 2])
+    "1 - 2 - 3" `shouldParse` (EPrim PMinus [EPrim PMinus [EInt 1, EInt 2], EInt 3])
+    "1 - 2 * 3" `shouldParse` (EPrim PMinus [EInt 1, EPrim PTimes [EInt 2, EInt 3]])
+    "(1 - 2) * 3" `shouldParse` (EPrim PTimes [EPrim PMinus [EInt 1, EInt 2], EInt 3])
+    "1 / 2" `shouldParse` (EPrim PDivide [EInt 1, EInt 2])
+    "1 + 2 / 3" `shouldParse` (EPrim PPlus [EInt 1, EPrim PDivide [EInt 2, EInt 3]])
+    "0 - 1 + 2 / 3" `shouldParse` (EPrim PPlus [EPrim PMinus [EInt 0, EInt 1],EPrim PDivide [EInt 2, EInt 3]])
+    "source<foo;[int];[1,2,3 : int]>" `shouldParse` (ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3]))
   -- describe "parsing typ" $ do
   --   let shouldParse s v = it (T.unpack s) $ parseT s `shouldBe` Right v
   --   "int" `shouldParse` TInt
