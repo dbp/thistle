@@ -90,6 +90,7 @@ data Id = Id Text deriving (Show, Eq)
 
 data UserId = UserId Int deriving (Show, Eq)
 
+type SourceResolver = VS -> IO (Maybe V)
 
 
 tc :: TEnv -> E -> T

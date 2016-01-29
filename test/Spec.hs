@@ -330,6 +330,17 @@ main = hspec $ do
                                                    ,EInt 3]
     "() {1} ()" `shouldParse` EApp (ELam [] (EInt 1)) []
     "(x : -> int) {x()} (() { 1})" `shouldParse` EApp (ELam [(Var "x", TLam [] TInt )] (EApp (EVar (Var "x")) [])) [ELam [] (EInt 1)]
+    "{x: 1, y: 2}" `shouldParse` EObject (M.fromList [("x", EInt 1), ("y", EInt 2)])
+    "{x: 1}" `shouldParse` EObject (M.fromList [("x", EInt 1)])
+    "{}" `shouldParse` EObject M.empty
+    "if true { 1 } else { 2 }" `shouldParse` EIf (EBool True) (EInt 1) (EInt 2)
+    "if () { true } () { 1 } else { 2 }" `shouldParse` EIf (EApp (ELam [] (EBool True)) []) (EInt 1) (EInt 2)
+    "case [:int] { 1 } (_ _) { 2 }" `shouldParse` (ECase (EList TInt []) (EInt 1) (Var "_") (Var "_") (EInt 2))
+    "case [3 : int] { 1 } (h t) { h }" `shouldParse` (ECase (EList TInt [EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "h")))
+    "x.y" `shouldParse` (EDot (EVar (Var "x")) "y")
+    "{y: 1}.y" `shouldParse` (EDot (EObject (M.fromList [("y", EInt 1)])) "y")
+    "x = 2 in x" `shouldParse` (ELet (Var "x") (EInt 2) (EVar (Var "x")))
+    "x = y = 0 in 10 in x" `shouldParse` (ELet (Var "x") (ELet (Var "y") (EInt 0) (EInt 10)) (EVar (Var "x")))
   -- describe "parsing typ" $ do
   --   let shouldParse s v = it (T.unpack s) $ parseT s `shouldBe` Right v
   --   "int" `shouldParse` TInt
