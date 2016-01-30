@@ -1,10 +1,12 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Web where
 
 import qualified Blaze.ByteString.Builder as Blaze
+import           Control.Exception        (SomeException, catch)
 import           Control.Lens
 import           Data.Monoid
 import           Data.Text                (Text)
@@ -16,9 +18,9 @@ import           System.Directory         (doesFileExist)
 import qualified Text.XmlHtml             as X
 import           Web.Fn
 
+import           Grammar
 import           Lang
 import           Lexer
-import           ParseE
 
 data Ctxt = Ctxt { _req :: FnRequest }
 makeLenses ''Ctxt
@@ -48,22 +50,25 @@ handle ctxt pth =
          case X.parseHTML (T.unpack f) (T.encodeUtf8 contents) of
            Left err -> errText (T.pack err)
            Right (X.HtmlDocument enc typ doc) ->
-             do let x = evalTemplate progtext doc
+             do x <- evalTemplate progtext doc
                 let b = X.render (X.HtmlDocument enc typ x)
                 okHtml $ T.decodeUtf8 $ Blaze.toByteString b
            Right _ -> error "renderFile: parseHTML returned XML."
 
-evalTemplate :: Text -> [X.Node] -> [X.Node]
-evalTemplate progtext nodes = map evalNode nodes
+evalTemplate :: Text -> [X.Node] -> IO [X.Node]
+evalTemplate progtext nodes = mapM evalNode nodes
   where evalNode n@(X.Element t atrs cs) |
-                   t == "eval" &&
-                   X.hasAttribute "src" n =
-          let Just src = X.getAttribute "src" n
-              prog' = progtext <> " in " <> src
-              prog = parse (lexer (T.unpack prog'))
-              !t = tc emptyTEnv prog
-              (v,_) = eval emptyEnv prog
-          in X.TextNode (renderV v)
+                   t == "show" &&
+                   X.hasAttribute "e" n =
+          catch (let Just src = X.getAttribute "e" n
+                     prog' = progtext <> " in " <> src
+                     prog = parse (lexer (T.unpack prog'))
+                     !t = tc emptyTEnv prog
+                     (v,_) = eval emptyEnv prog
+                 in return $ X.TextNode (renderV v))
+                (\(e ::SomeException) ->
+                   return $ X.TextNode (T.pack (show e)))
         evalNode (X.Element t atrs cs) =
-          X.Element t atrs (map evalNode cs)
-        evalNode n = n
+          do cs' <- mapM evalNode cs
+             return $ X.Element t atrs cs'
+        evalNode n = return n

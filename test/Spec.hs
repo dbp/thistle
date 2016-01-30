@@ -5,9 +5,9 @@ import qualified Data.Map          as M
 import qualified Data.Text         as T
 import           Test.Hspec
 
+import qualified Grammar
 import           Lang
 import           Lexer
-import qualified ParseE
 
 main :: IO ()
 main = hspec $ do
@@ -299,7 +299,7 @@ main = hspec $ do
         evaluate (tc emptyTEnv (ESource (ES (Id "foo") (TObject (M.fromList [("x", TLam [TInt] TInt)]))) (EObject (M.fromList [("x", ELam [(Var "x", TInt)] (EVar (Var "x")))]))))
                  `shouldThrow` anyErrorCall
   describe "parsing expr" $ do
-    let shouldParse s v = it s $ ParseE.parse (lexer s) `shouldBe` v
+    let shouldParse s v = it s $ Grammar.parse (lexer s) `shouldBe` v
     "1" `shouldParse` EInt 1
     "012345" `shouldParse` EInt 12345
     "1.0" `shouldParse` EDouble 1.0

@@ -1,5 +1,5 @@
 {
-module ParseE (parse) where
+module Grammar (parse) where
 
 import Data.Monoid
 import qualified Data.Map as M

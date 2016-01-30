@@ -21,7 +21,7 @@ library
   exposed-modules: Web
                  , Lang
                  , Lexer
-                 , ParseE
+                 , Grammar
   build-depends:   base >= 4.7 && < 5
                  , text
                  , containers
