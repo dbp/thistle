@@ -353,6 +353,7 @@ main = hspec $ do
     "1 + 2 / 3" `shouldParse` (EPrim PPlus [EInt 1, EPrim PDivide [EInt 2, EInt 3]])
     "0 - 1 + 2 / 3" `shouldParse` (EPrim PPlus [EPrim PMinus [EInt 0, EInt 1],EPrim PDivide [EInt 2, EInt 3]])
     "source<foo;[int];[1,2,3 : int]>" `shouldParse` (ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3]))
+    "x = 10 y = 20 in y" `shouldParse` (ELet (Var "x") (EInt 10) (ELet (Var "y") (EInt 20) (EVar (Var "y"))))
   -- describe "parsing typ" $ do
   --   let shouldParse s v = it (T.unpack s) $ parseT s `shouldBe` Right v
   --   "int" `shouldParse` TInt
