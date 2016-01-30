@@ -8,6 +8,7 @@ its result. This is used for out-of-language mutation and then
 recomputation.
 
 -}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Lang where
 
@@ -16,6 +17,7 @@ import qualified Data.Map    as M
 import           Data.Maybe  (fromMaybe)
 import           Data.Monoid ((<>))
 import           Data.Text   (Text)
+import qualified Data.Text   as T
 
 data T = TInt
        | TDouble
@@ -80,6 +82,16 @@ data V = VInt Int
        | VObject (M.Map Text V)
        | VLam Env [Var] E
        deriving (Show, Eq)
+
+renderV :: V -> Text
+renderV (VInt n) = T.pack (show n)
+renderV (VDouble n) = T.pack (show n)
+renderV (VBool True) = "true"
+renderV (VBool False) = "false"
+renderV (VString s) = s
+renderV (VList vs) = "[" <> T.intercalate ", " (map renderV vs) <> "]"
+renderV (VObject m) = "{" <> T.intercalate ", " (map (\(k,v) -> k <> ": " <> renderV v) $ M.assocs m) <> "}"
+renderV (VLam _ as _) = "(" <> T.intercalate ", " (map (\(Var v) -> v) as) <> ") { .. }"
 
 data VS = VSBase Id [UserId] V
         | VSList Id [UserId] [VS]
