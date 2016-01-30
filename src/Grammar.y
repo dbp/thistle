@@ -12,6 +12,7 @@ import Lang
 %tokentype { Token }
 %error { parseError }
 %right in
+%left '=='
 %left '+' '-'
 %left '*' '/'
 
@@ -30,6 +31,7 @@ import Lang
       '-'             { TokenMinus }
       '/'             { TokenDivide }
       '='             { TokenEqual }
+      '=='            { TokenEquals }
       var             { TokenVar $$ }
       string          { TokenString $$ }
       tint            { TokenTInt }
@@ -69,6 +71,7 @@ Exp   : int  { EInt $1 }
       | case Exp '{' Exp '}' '(' var var ')' '{' Exp '}' { ECase $2 $4 (Var $7) (Var $8) $11 }
       | Exp '.' var { EDot $1 $3 }
       | LetExp { $1 }
+      | Exp '==' Exp { EPrim PEquals [$1, $3] }
       | Exp '+' Exp { EPrim PPlus [$1, $3] }
       | Exp '-' Exp { EPrim PMinus [$1, $3] }
       | Exp '*' Exp { EPrim PTimes [$1, $3] }

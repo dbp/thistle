@@ -29,6 +29,7 @@ data Token
       | TokenElse
       | TokenCase
       | TokenEqual
+      | TokenEquals
       | TokenIn
       | TokenSource
       | TokenAO
@@ -48,6 +49,7 @@ lexer (c:cs)
       | isDigit c = lexNum (c:cs)
 lexer ('.':cs) = TokenDot : lexer cs
 lexer (',':cs) = TokenComma : lexer cs
+lexer ('=':'=':cs) = TokenEquals : lexer cs
 lexer ('=':cs) = TokenEqual : lexer cs
 lexer ('-':'>':cs) = TokenArrow : lexer cs
 lexer (':':cs) = TokenColon : lexer cs

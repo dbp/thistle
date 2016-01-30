@@ -117,6 +117,34 @@ main = hspec $ do
       it "/ on doubles" $
         eval emptyEnv (EPrim PDivide [EDouble 3, EDouble 2])
              `shouldBe` (VDouble 1.5, [])
+      it "== on ints" $ do
+        eval emptyEnv (EPrim PEquals [EInt 1, EInt 1])
+             `shouldBe` (VBool True, [])
+        eval emptyEnv (EPrim PEquals [EInt 1, EInt 2])
+             `shouldBe` (VBool False, [])
+      it "== on doubles" $ do
+        eval emptyEnv (EPrim PEquals [EDouble 1, EDouble 1])
+             `shouldBe` (VBool True, [])
+        eval emptyEnv (EPrim PEquals [EDouble 1, EDouble 2])
+             `shouldBe` (VBool False, [])
+      it "== on strings" $ do
+        eval emptyEnv (EPrim PEquals [EString "a", EString "a"])
+             `shouldBe` (VBool True, [])
+        eval emptyEnv (EPrim PEquals [EString "", EString "a"])
+             `shouldBe` (VBool False, [])
+      it "== on lists" $ do
+        eval emptyEnv (EPrim PEquals [EList TInt [EInt 1], EList TInt [EInt 1]])
+             `shouldBe` (VBool True, [])
+        eval emptyEnv (EPrim PEquals [EList TInt [], EList TInt [EInt 1]])
+             `shouldBe` (VBool False, [])
+      it "== on objects" $ do
+        eval emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1)]), EObject (M.fromList [("x", EInt 1)])])
+             `shouldBe` (VBool True, [])
+        eval emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1), ("y", EInt 2)]), EObject (M.fromList [("y", EInt 2), ("x", EInt 1)])])
+             `shouldBe` (VBool True, [])
+        eval emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1), ("y", EInt 2)]), EObject (M.fromList [("y", EInt 2)])])
+             `shouldBe` (VBool False, [])
+
     describe "sources" $ do
       it "sources should produce their default values" $
         eval emptyEnv (ESource (ES (Id "1") TInt) (EInt 10))
@@ -221,6 +249,55 @@ main = hspec $ do
              `shouldBe` TDouble
         it "doesn't work on doubles and ints" $
           evaluate (tc emptyTEnv (EPrim PDivide [EDouble 1, EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "== on ints" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PEquals [EInt 1, EInt 10])
+             `shouldBe` TBool
+        it "doesn't work on doubles and ints" $
+          evaluate (tc emptyTEnv (EPrim PEquals [EDouble 1, EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "== on doubles" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PEquals [EDouble 1, EDouble 10])
+             `shouldBe` TBool
+        it "doesn't work on doubles and ints" $
+          evaluate (tc emptyTEnv (EPrim PEquals [EDouble 1, EInt 10]))
+                   `shouldThrow` anyErrorCall
+      describe "== on strings" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PEquals [EString "", EString "bla"])
+             `shouldBe` TBool
+        it "doesn't work on strings and ints" $
+          evaluate (tc emptyTEnv (EPrim PEquals [EString "1", EInt 1]))
+                   `shouldThrow` anyErrorCall
+      describe "== on lists" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PEquals [EList TInt [], EList TInt []])
+             `shouldBe` TBool
+        it "doesn't work on lists of different types" $
+          evaluate (tc emptyTEnv (EPrim PEquals [EList TInt [], EList TString []]))
+                   `shouldThrow` anyErrorCall
+      describe "== on objects" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PEquals [EObject $ M.fromList [("x", EInt 1)], EObject $ M.fromList [("x", EInt 2)]])
+             `shouldBe` TBool
+        it "doesn't work on fields of different types" $
+          evaluate (tc emptyTEnv (EPrim PEquals [EObject $ M.fromList [("x", EInt 1)], EObject $ M.fromList [("x", EDouble 2)]]))
+                   `shouldThrow` anyErrorCall
+        it "doesn't work on different fields" $ do
+          evaluate (tc emptyTEnv (EPrim PEquals [EObject $ M.fromList [("x", EInt 1)], EObject $ M.fromList [("y", EInt 2)]]))
+                   `shouldThrow` anyErrorCall
+          evaluate (tc emptyTEnv (EPrim PEquals [EObject $ M.fromList [("x", EInt 1)], EObject $ M.fromList [("x", EInt 1), ("y", EInt 2)]]))
+                   `shouldThrow` anyErrorCall
+          evaluate (tc emptyTEnv (EPrim PEquals [EObject $ M.fromList [("y", EInt 2), ("x", EInt 1)], EObject $ M.fromList [("y", EInt 2)]]))
+                   `shouldThrow` anyErrorCall
+      describe "== on bools" $ do
+        it "works" $
+          tc emptyTEnv (EPrim PEquals [EBool True, EBool False])
+             `shouldBe` TBool
+        it "doesn't work on bools and ints" $
+          evaluate (tc emptyTEnv (EPrim PEquals [EBool True, EInt 1]))
                    `shouldThrow` anyErrorCall
     describe "vars, let, lam, and application" $ do
       it "(x:int) { x } typechecks" $
@@ -352,6 +429,10 @@ main = hspec $ do
     "1 / 2" `shouldParse` (EPrim PDivide [EInt 1, EInt 2])
     "1 + 2 / 3" `shouldParse` (EPrim PPlus [EInt 1, EPrim PDivide [EInt 2, EInt 3]])
     "0 - 1 + 2 / 3" `shouldParse` (EPrim PPlus [EPrim PMinus [EInt 0, EInt 1],EPrim PDivide [EInt 2, EInt 3]])
+    "1 == 2" `shouldParse` (EPrim PEquals [EInt 1, EInt 2])
+    "1 + 1 == 2" `shouldParse` (EPrim PEquals [EPrim PPlus [EInt 1, EInt 1], EInt 2])
+    "1 + 1 == 2 * 1" `shouldParse` (EPrim PEquals [EPrim PPlus [EInt 1, EInt 1], EPrim PTimes [EInt 2, EInt 1]])
+    "1 + 1 * 2 == 2 - 1" `shouldParse` (EPrim PEquals [EPrim PPlus [EInt 1, EPrim PTimes [EInt 1, EInt 2]], EPrim PMinus [EInt 2, EInt 1]])
     "source<foo;[int];[1,2,3 : int]>" `shouldParse` (ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3]))
     "x = 10 y = 20 in y" `shouldParse` (ELet (Var "x") (EInt 10) (ELet (Var "y") (EInt 20) (EVar (Var "y"))))
   -- describe "parsing typ" $ do

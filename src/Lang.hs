@@ -34,6 +34,7 @@ data Prim = PPlus
           | PTimes
           | PMinus
           | PDivide
+          | PEquals
           deriving (Show, Eq)
 
 data E = EInt Int
@@ -196,6 +197,14 @@ tc env (EPrim p es)              =
         [o, TDouble] -> error $ "tc: Can't mix / with TDouble and " <> show o
         [a,b] -> error $ "tc: Invalid arguments to /: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to /."
+    PEquals ->
+      case map (tc env) es of
+        [t1, t2] | t1 == t2 && notLam t1 -> TBool
+          where notLam (TLam _ _) = False
+                notLam _ = True
+        [a,b] -> error $ "tc: Invalid arguments to ==: " <> show a <> " and " <> show b
+        _ -> error "tc: Need two arguments to ==."
+
 tc env (ESource (ES _id t) def) =
   if haslam t then error $ "tc: Sources cannot contain functions. Found one in type: " <> show t
   else let tv = tc env def
@@ -283,6 +292,11 @@ eval env (EPrim p es)      =
                     [VInt a, VInt b] -> (VInt (a `div` b), ss)
                     [VDouble a, VDouble b] -> (VDouble (a / b), ss)
                     _ -> error $ "*: didn't get two ints, or two doubles, got: " <> show vs
+       PEquals -> case vs of
+                    [VLam _ _ _, _] -> error "==: can't compare functions."
+                    [_, VLam _ _ _] -> error "==: can't compare functions."
+                    [v1, v2] -> (VBool (v1 == v2), ss)
+                    _ -> error $ "==: didn't get two arguments, got: " <> show vs
 eval env (ESource (ES id' _t) def)      =
   let v = eval env def
   in (fst v, snd v <> [VSBase id' [] (fst v)])
