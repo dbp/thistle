@@ -38,8 +38,6 @@ renderT (TList t) = "[" <> renderT t <> "]"
 renderT (TObject fs) = "{" <> T.intercalate "," (map (\(k, v) -> k <> ": " <> renderT v) (M.assocs fs)) <> "}"
 renderT (TLam as r) = T.intercalate ", " (map renderT as) <> " -> " <> renderT r
 
-data Var = Var Text deriving (Show, Eq, Ord)
-
 data Prim = PPlus
           | PTimes
           | PMinus
@@ -53,36 +51,36 @@ data E = EInt Int
        | EString Text
        | EList T [E]
        | EObject (M.Map Text E)
-       | EVar Var
-       | ELam [(Var, T)] T E
+       | EVar Text
+       | ELam [(Text, T)] T E
        | EApp E [E]
        | EIf E E E
-       | ECase E E Var Var E
+       | ECase E E Text Text E
        | EDot E Text
-       | ELet Var E E
+       | ELet Text E E
        | EPrim Prim [E]
        | ESource ES E
        deriving (Show, Eq)
 
 data ES = ES Id T deriving (Show, Eq)
 
-data Env = Env (M.Map Var V) deriving (Show, Eq)
+data Env = Env (M.Map Text V) deriving (Show, Eq)
 
 emptyEnv :: Env
 emptyEnv = Env M.empty
 
-envFromList :: [(Var, V)] -> Env
+envFromList :: [(Text, V)] -> Env
 envFromList ls = Env (M.fromList ls)
 
-extendEnv :: Env -> [(Var, V)] -> Env
+extendEnv :: Env -> [(Text, V)] -> Env
 extendEnv (Env e) vs = Env (M.union (M.fromList vs) e)
 
-data TEnv = TEnv (M.Map Var T) deriving (Show, Eq)
+data TEnv = TEnv (M.Map Text T) deriving (Show, Eq)
 
 emptyTEnv :: TEnv
 emptyTEnv = TEnv M.empty
 
-extendTEnv :: TEnv -> [(Var, T)] -> TEnv
+extendTEnv :: TEnv -> [(Text, T)] -> TEnv
 extendTEnv (TEnv e) vs = TEnv (M.union (M.fromList vs) e)
 
 data V = VInt Int
@@ -91,7 +89,7 @@ data V = VInt Int
        | VString Text
        | VList [V]
        | VObject (M.Map Text V)
-       | VLam Env [Var] E
+       | VLam Env [Text] E
        deriving (Show, Eq)
 
 renderV :: V -> Text
@@ -102,7 +100,7 @@ renderV (VBool False) = "false"
 renderV (VString s) = s
 renderV (VList vs) = "[" <> T.intercalate ", " (map renderV vs) <> "]"
 renderV (VObject m) = "{" <> T.intercalate ", " (map (\(k,v) -> k <> ": " <> renderV v) $ M.assocs m) <> "}"
-renderV (VLam _ as _) = "(" <> T.intercalate ", " (map (\(Var v) -> v) as) <> ") { .. }"
+renderV (VLam _ as _) = "(" <> T.intercalate ", " (map (\v -> v) as) <> ") { .. }"
 
 data VS = VSBase Id [UserId] V
         | VSList Id [UserId] [VS]

@@ -94,8 +94,8 @@ evalTemplate env tenv ns = (\(_,_,x) -> x) <$>
                      VList vs ->
                        foldM (\(env, tenv, ns) v ->
                           do ns' <- evalTemplate
-                                      (extendEnv env [(Var var, v)])
-                                      (extendTEnv tenv [(Var var, t)])
+                                      (extendEnv env [(var, v)])
+                                      (extendTEnv tenv [(var, t)])
                                       cs
                              return (env, tenv, ns ++ ns'))
                             (env, tenv, [])
@@ -112,7 +112,7 @@ evalTemplate env tenv ns = (\(_,_,x) -> x) <$>
                         prog = parse (lexer (T.unpack src))
                         !(t,_) = tc False tenv prog
                         (v,_) = eval env prog
-                    in return (extendEnv env [(Var var, v)], extendTEnv tenv [(Var var, t)], ns))
+                    in return (extendEnv env [(var, v)], extendTEnv tenv [( var, t)], ns))
                    (\(e ::SomeException) ->
                       return (env, tenv, ns ++ [X.TextNode (T.pack (show e))]))
         evalNode (env,tenv,ns) (X.Element t atrs cs) =

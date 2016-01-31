@@ -33,43 +33,43 @@ main = hspec $ do
            `shouldBe` (VObject (M.fromList [("k", VInt 2),("l", VInt 3)]), [])
     describe "vars, let, lams, and application" $ do
       it "lookup" $
-        eval (envFromList [(Var "x", VInt 10)]) (EVar (Var "x"))
+        eval (envFromList [("x", VInt 10)]) (EVar ("x"))
           `shouldBe` (VInt 10, [])
       it "applying one argument functions" $
-        eval emptyEnv (EApp (ELam [(Var "x", TInt)] TInt (EVar (Var "x"))) [EInt 10])
+        eval emptyEnv (EApp (ELam [("x", TInt)] TInt (EVar ("x"))) [EInt 10])
              `shouldBe` (VInt 10, [])
       it "applying two argument functions" $
-        eval emptyEnv (EApp (ELam [(Var "x", TInt), (Var "y", TInt)] TInt (EVar (Var "x"))) [EInt 10, EInt 20])
+        eval emptyEnv (EApp (ELam [("x", TInt), ("y", TInt)] TInt (EVar ("x"))) [EInt 10, EInt 20])
              `shouldBe` (VInt 10, [])
       it "applying closures" $
-        eval (envFromList [(Var "f", VLam emptyEnv [Var "x"] (EVar (Var "x")))])
-             (EApp (EVar (Var "f")) [EInt 10])
+        eval (envFromList [("f", VLam emptyEnv ["x"] (EVar ("x")))])
+             (EApp (EVar ("f")) [EInt 10])
              `shouldBe` (VInt 10, [])
       it "let binding" $
-        eval emptyEnv (ELet (Var "x") (EInt 1) (EVar (Var "x")))
+        eval emptyEnv (ELet ("x") (EInt 1) (EVar ("x")))
              `shouldBe` (VInt 1, [])
       it "let shadowing existing vars in env" $
-        eval (envFromList [(Var "x", VInt 10)])
-             (ELet (Var "x") (EInt 1) (EVar (Var "x")))
+        eval (envFromList [("x", VInt 10)])
+             (ELet ("x") (EInt 1) (EVar ("x")))
              `shouldBe` (VInt 1, [])
       it "let shadowing let" $
         eval emptyEnv
-             (ELet (Var "x") (EInt 2)
-                             (ELet (Var "x") (EInt 1) (EVar (Var "x"))))
+             (ELet ("x") (EInt 2)
+                             (ELet ("x") (EInt 1) (EVar ("x"))))
              `shouldBe` (VInt 1, [])
       it "let should be recursive" $
          eval emptyEnv
-              (ELet (Var "f") (ELam [(Var "x", TList TInt)] TInt
-                                    (ECase (EVar (Var "x"))
+              (ELet ("f") (ELam [("x", TList TInt)] TInt
+                                    (ECase (EVar ("x"))
                                            (EInt 0)
-                                           (Var "_")
-                                           (Var "rest")
+                                           ("_")
+                                           ("rest")
                                            (EPrim
                                               PPlus
                                               [EInt 1,
-                                               EApp (EVar (Var "f"))
-                                                    [EVar (Var "rest")]])))
-                    (EApp (EVar (Var "f")) [EList TInt [EInt 0, EInt 0, EInt 0]]))
+                                               EApp (EVar ("f"))
+                                                    [EVar ("rest")]])))
+                    (EApp (EVar ("f")) [EList TInt [EInt 0, EInt 0, EInt 0]]))
               `shouldBe` (VInt 3, [])
     describe "if, case, and dot" $ do
       it "if true" $
@@ -79,16 +79,16 @@ main = hspec $ do
         eval emptyEnv (EIf (EBool False) (EInt 1) (EInt 2))
              `shouldBe` (VInt 2, [])
       it "case on empty lists" $
-        eval emptyEnv (ECase (EList TInt []) (EInt 1) (Var "h") (Var "t") (EInt 2))
+        eval emptyEnv (ECase (EList TInt []) (EInt 1) "h" "t" (EInt 2))
              `shouldBe` (VInt 1, [])
       it "case on non-empty list" $
-        eval emptyEnv (ECase (EList TInt [EInt 1]) (EInt 1) (Var "h") (Var "t") (EInt 2))
+        eval emptyEnv (ECase (EList TInt [EInt 1]) (EInt 1) "h" "t" (EInt 2))
              `shouldBe` (VInt 2, [])
       it "case on non-empty, using head" $
-        eval emptyEnv (ECase (EList TInt [EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "h")))
+        eval emptyEnv (ECase (EList TInt [EInt 3]) (EInt 1) "h" "t" (EVar "h"))
              `shouldBe` (VInt 3, [])
       it "case on non-empty, using tail" $
-        eval emptyEnv (ECase (EList TInt [EInt 2, EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "t")))
+        eval emptyEnv (ECase (EList TInt [EInt 2, EInt 3]) (EInt 1) "h" "t" (EVar "t"))
              `shouldBe` (VList [VInt 3] , [])
       it "dot on object should get field" $
         eval emptyEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "x")
@@ -293,42 +293,42 @@ main = hspec $ do
                    `shouldThrow` anyErrorCall
     describe "vars, let, lam, and application" $ do
       it "(x:int) : int { x } typechecks" $
-        ELam [(Var "x", TInt)] TInt (EVar (Var "x"))
+        ELam [("x", TInt)] TInt (EVar "x")
              `shouldTypeAs` TLam [TInt] TInt
       it "(x:int) : int { x x } fails" $
-        evaluate (tc False emptyTEnv (ELam [(Var "x", TInt)] TInt (EApp (EVar (Var "x"))  [(EVar (Var "x"))])))
+        evaluate (tc False emptyTEnv (ELam [("x", TInt)] TInt (EApp (EVar "x")  [(EVar "x")])))
                  `shouldThrow` anyErrorCall
       it "(x:int) : int{ 10 } typechecks" $
-        ELam [(Var "x", TInt)] TInt (EInt 10)
+        ELam [("x", TInt)] TInt (EInt 10)
            `shouldTypeAs` TLam [TInt] TInt
       it "(f : int -> int) : int { f 10 } typechecks" $
-        ELam [(Var "f", TLam [TInt] TInt)] TInt (EApp (EVar (Var "f")) [EInt 10])
+        ELam [("f", TLam [TInt] TInt)] TInt (EApp (EVar "f") [EInt 10])
            `shouldTypeAs` TLam [TLam [TInt] TInt] TInt
       it "(x:int y:bool) : bool { y } typechecks" $
-        ELam [(Var "x", TInt),(Var "y", TBool)] TBool
-                           (EVar (Var "y"))
+        ELam [("x", TInt),("y", TBool)] TBool
+                           (EVar "y")
            `shouldTypeAs` TLam [TInt, TBool] TBool
       it "(f : int -> bool) : bool { f true } fails" $
-        evaluate (tc False emptyTEnv (ELam [(Var "f", TLam [TInt] TBool)] TBool (EApp (EVar (Var "f")) [EBool True])))
+        evaluate (tc False emptyTEnv (ELam [("f", TLam [TInt] TBool)] TBool (EApp (EVar "f") [EBool True])))
                    `shouldThrow` anyErrorCall
       it "x = 2 in x" $
-        ELet (Var "x") (EInt 2) (EVar (Var "x"))
+        ELet "x" (EInt 2) (EVar "x")
            `shouldTypeAs` TInt
       it "x = 2 in x = true in x" $
-        ELet (Var "x") (EInt 2) (ELet (Var "x") (EBool True) (EVar (Var "x")))
+        ELet "x" (EInt 2) (ELet "x" (EBool True) (EVar "x"))
            `shouldTypeAs` TBool
       it "recursive functions type check" $
-        ELet (Var "f") (ELam [(Var "x", TList TInt)] TInt
-                                    (ECase (EVar (Var "x"))
+        ELet "f" (ELam [("x", TList TInt)] TInt
+                                    (ECase (EVar "x")
                                            (EInt 0)
-                                           (Var "_")
-                                           (Var "rest")
+                                           "_"
+                                           "rest"
                                            (EPrim
                                               PPlus
                                               [EInt 1,
-                                               EApp (EVar (Var "f"))
-                                                    [EVar (Var "rest")]])))
-                    (EApp (EVar (Var "f")) [EList TInt [EInt 0, EInt 0, EInt 0]])
+                                               EApp (EVar "f")
+                                                    [EVar "rest"]])))
+                    (EApp (EVar "f") [EList TInt [EInt 0, EInt 0, EInt 0]])
           `shouldTypeAs` TInt
     describe "if, dot, and case" $ do
       it "if true 1 2 typechecks" $
@@ -340,7 +340,7 @@ main = hspec $ do
         evaluate (tc False emptyTEnv (EIf (EInt 1) (EInt 1) (EInt 1)))
                  `shouldThrow` anyErrorCall
       it "if true (x : int) { 10 } (y : int) { 20 } typechecks" $
-        EIf (EBool True) (ELam [(Var "x", TInt)] TInt (EInt 10)) (ELam [(Var "y", TInt)] TInt (EInt 20))
+        EIf (EBool True) (ELam [("x", TInt)] TInt (EInt 10)) (ELam [("y", TInt)] TInt (EInt 20))
            `shouldTypeAs` TLam [TInt] TInt
       it "{x: 1}.x typechecks" $
          EDot (EObject (M.fromList [("x", EInt 1)])) "x"
@@ -349,19 +349,19 @@ main = hspec $ do
          evaluate (tc False emptyTEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "y"))
                   `shouldThrow` anyErrorCall
       it "case [:int] { 1 } (_ _) { 2 } typechecks" $
-        ECase (EList TInt []) (EInt 1) (Var "_") (Var "_") (EInt 2)
+        ECase (EList TInt []) (EInt 1) ("_") ("_") (EInt 2)
            `shouldTypeAs` TInt
       it "case [:int] { true } (_ _) { 2 } fails" $
-        evaluate (tc False emptyTEnv (ECase (EList TInt []) (EBool True) (Var "_") (Var "_") (EInt 2)))
+        evaluate (tc False emptyTEnv (ECase (EList TInt []) (EBool True) ("_") ("_") (EInt 2)))
                  `shouldThrow` anyErrorCall
       it "case [:int] { true } (h _) { h } fails" $
-        evaluate (tc False emptyTEnv (ECase (EList TInt []) (EBool True) (Var "h") (Var "_") (EVar (Var "h"))))
+        evaluate (tc False emptyTEnv (ECase (EList TInt []) (EBool True) ("h") ("_") (EVar ("h"))))
                  `shouldThrow` anyErrorCall
       it "case [:int] { 1 } (h _) { h } typechecks" $
-        ECase (EList TInt []) (EInt 1) (Var "h") (Var "_") (EVar (Var "h"))
+        ECase (EList TInt []) (EInt 1) ("h") ("_") (EVar ("h"))
           `shouldTypeAs` TInt
       it "case [:int] { 1 } (_ t) { t } fails" $
-        evaluate (tc False emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "t") (EVar (Var "t"))))
+        evaluate (tc False emptyTEnv (ECase (EList TInt []) (EInt 1) ("_") ("t") (EVar ("t"))))
                  `shouldThrow` anyErrorCall
     describe "sources" $ do
       it "source<foo;int;1> typechecks" $
@@ -374,10 +374,10 @@ main = hspec $ do
         evaluate (tc False emptyTEnv (ESource (ES (Id "foo") TInt) (EString "too")))
                  `shouldThrow` anyErrorCall
       it "source<foo; int -> int; (x : int) { x }> fails" $
-        evaluate (tc False emptyTEnv (ESource (ES (Id "foo") (TLam [TInt] TInt)) (ELam [(Var "x", TInt)] TInt (EVar (Var "x")))))
+        evaluate (tc False emptyTEnv (ESource (ES (Id "foo") (TLam [TInt] TInt)) (ELam [("x", TInt)] TInt (EVar ("x")))))
                  `shouldThrow` anyErrorCall
       it "source<foo; { x : int -> int }; {x: (y : int) { y } }> fails" $
-        evaluate (tc False emptyTEnv (ESource (ES (Id "foo") (TObject (M.fromList [("x", TLam [TInt] TInt)]))) (EObject (M.fromList [("x", ELam [(Var "x", TInt)] TInt (EVar (Var "x")))]))))
+        evaluate (tc False emptyTEnv (ESource (ES (Id "foo") (TObject (M.fromList [("x", TLam [TInt] TInt)]))) (EObject (M.fromList [("x", ELam [("x", TInt)] TInt (EVar ("x")))]))))
                  `shouldThrow` anyErrorCall
   describe "parsing expr" $ do
     let shouldParse s v = it s $ Grammar.parse (lexer s) `shouldBe` v
@@ -396,32 +396,32 @@ main = hspec $ do
                                            ,EInt 1
                                            ,EInt 2]
     "[[:int]:[int]]" `shouldParse` EList (TList TInt) [EList TInt []]
-    "x" `shouldParse` EVar (Var "x")
-    "x1_z" `shouldParse` EVar (Var "x1_z")
-    "x1-z" `shouldParse` EVar (Var "x1-z")
-    "a'" `shouldParse` EVar (Var "a'")
-    "(x : int) : int { x }" `shouldParse` ELam [(Var "x", TInt)] TInt
-                                         (EVar (Var "x"))
-    "(x : int, y : string) : int { x }" `shouldParse` ELam [(Var "x", TInt), (Var "y", TString)] TInt
-                                                  (EVar (Var "x"))
+    "x" `shouldParse` EVar ("x")
+    "x1_z" `shouldParse` EVar ("x1_z")
+    "x1-z" `shouldParse` EVar ("x1-z")
+    "a'" `shouldParse` EVar ("a'")
+    "(x : int) : int { x }" `shouldParse` ELam [("x", TInt)] TInt
+                                         (EVar ("x"))
+    "(x : int, y : string) : int { x }" `shouldParse` ELam [("x", TInt), ("y", TString)] TInt
+                                                  (EVar ("x"))
     "() : int { 1 }" `shouldParse` ELam [] TInt (EInt 1)
-    "x()" `shouldParse` EApp (EVar (Var "x")) []
-    "x(1,2,3)" `shouldParse` EApp (EVar (Var "x")) [EInt 1
+    "x()" `shouldParse` EApp (EVar ("x")) []
+    "x(1,2,3)" `shouldParse` EApp (EVar ("x")) [EInt 1
                                                    ,EInt 2
                                                    ,EInt 3]
     "() : int {1} ()" `shouldParse` EApp (ELam [] TInt (EInt 1)) []
-    "(x : -> int) : int {x()} (() : int { 1})" `shouldParse` EApp (ELam [(Var "x", TLam [] TInt )] TInt (EApp (EVar (Var "x")) [])) [ELam [] TInt (EInt 1)]
+    "(x : -> int) : int {x()} (() : int { 1})" `shouldParse` EApp (ELam [("x", TLam [] TInt )] TInt (EApp (EVar ("x")) [])) [ELam [] TInt (EInt 1)]
     "{x: 1, y: 2}" `shouldParse` EObject (M.fromList [("x", EInt 1), ("y", EInt 2)])
     "{x: 1}" `shouldParse` EObject (M.fromList [("x", EInt 1)])
     "{}" `shouldParse` EObject M.empty
     "if true { 1 } else { 2 }" `shouldParse` EIf (EBool True) (EInt 1) (EInt 2)
     "if () : bool { true } () { 1 } else { 2 }" `shouldParse` EIf (EApp (ELam [] TBool (EBool True)) []) (EInt 1) (EInt 2)
-    "case [:int] { 1 } (_ _) { 2 }" `shouldParse` (ECase (EList TInt []) (EInt 1) (Var "_") (Var "_") (EInt 2))
-    "case [3 : int] { 1 } (h t) { h }" `shouldParse` (ECase (EList TInt [EInt 3]) (EInt 1) (Var "h") (Var "t") (EVar (Var "h")))
-    "x.y" `shouldParse` (EDot (EVar (Var "x")) "y")
+    "case [:int] { 1 } (_ _) { 2 }" `shouldParse` (ECase (EList TInt []) (EInt 1) ("_") ("_") (EInt 2))
+    "case [3 : int] { 1 } (h t) { h }" `shouldParse` (ECase (EList TInt [EInt 3]) (EInt 1) ("h") ("t") (EVar ("h")))
+    "x.y" `shouldParse` (EDot (EVar ("x")) "y")
     "{y: 1}.y" `shouldParse` (EDot (EObject (M.fromList [("y", EInt 1)])) "y")
-    "x = 2 in x" `shouldParse` (ELet (Var "x") (EInt 2) (EVar (Var "x")))
-    "x = y = 0 in 10 in x" `shouldParse` (ELet (Var "x") (ELet (Var "y") (EInt 0) (EInt 10)) (EVar (Var "x")))
+    "x = 2 in x" `shouldParse` (ELet ("x") (EInt 2) (EVar ("x")))
+    "x = y = 0 in 10 in x" `shouldParse` (ELet ("x") (ELet ("y") (EInt 0) (EInt 10)) (EVar ("x")))
     "1 + 2" `shouldParse` (EPrim PPlus [EInt 1, EInt 2])
     "1 + 2 + 3" `shouldParse` (EPrim PPlus [EPrim PPlus [EInt 1, EInt 2], EInt 3])
     "1 + (2 + 3)" `shouldParse` (EPrim PPlus [EInt 1, EPrim PPlus [EInt 2, EInt 3]])
@@ -438,7 +438,7 @@ main = hspec $ do
     "1 + 1 == 2 * 1" `shouldParse` (EPrim PEquals [EPrim PPlus [EInt 1, EInt 1], EPrim PTimes [EInt 2, EInt 1]])
     "1 + 1 * 2 == 2 - 1" `shouldParse` (EPrim PEquals [EPrim PPlus [EInt 1, EPrim PTimes [EInt 1, EInt 2]], EPrim PMinus [EInt 2, EInt 1]])
     "source<foo;[int];[1,2,3 : int]>" `shouldParse` (ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3]))
-    "x = 10 y = 20 in y" `shouldParse` (ELet (Var "x") (EInt 10) (ELet (Var "y") (EInt 20) (EVar (Var "y"))))
+    "x = 10 y = 20 in y" `shouldParse` (ELet ("x") (EInt 10) (ELet ("y") (EInt 20) (EVar ("y"))))
   describe "evalTemplate" $ do
     let collapse' (X.Element t as cs) = X.Element t as (collapseText cs)
         collapse' n = n

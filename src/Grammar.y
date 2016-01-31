@@ -59,7 +59,7 @@ Exp   : int  { EInt $1 }
       | double { EDouble $1 }
       | true { EBool True }
       | false { EBool False }
-      | var { EVar (Var $1) }
+      | var { EVar ($1) }
       | string { EString $1 }
       | '[' ':' Type ']' { EList $3 [] }
       | '[' ListElems ':' Type ']' { EList $4 $2 }
@@ -70,7 +70,7 @@ Exp   : int  { EInt $1 }
       | '{' '}' { EObject M.empty }
       | '{' ObjectFields '}' { EObject (M.fromList $2) }
       | if Exp '{' Exp '}' else '{' Exp '}' { EIf $2 $4 $8 }
-      | case Exp '{' Exp '}' '(' var var ')' '{' Exp '}' { ECase $2 $4 (Var $7) (Var $8) $11 }
+      | case Exp '{' Exp '}' '(' var var ')' '{' Exp '}' { ECase $2 $4 ($7) ($8) $11 }
       | Exp '.' var { EDot $1 $3 }
       | LetExp { $1 }
       | Exp '==' Exp { EPrim PEquals [$1, $3] }
@@ -81,14 +81,14 @@ Exp   : int  { EInt $1 }
       | '(' Exp ')' { $2 }
       | source '<' var ';' Type ';' Exp '>' { ESource (ES (Id $3) $5) $7 }
 
-LetExp : var '=' Exp LetExp { ELet (Var $1) $3 $4 }
-       | var '=' Exp in Exp { ELet (Var $1) $3 $5 }
+LetExp : var '=' Exp LetExp { ELet ($1) $3 $4 }
+       | var '=' Exp in Exp { ELet ($1) $3 $5 }
 
 ListElems : Exp ',' ListElems { $1:$3 }
           | Exp { [$1] }
 
-LamArgs : var ':' Type ',' LamArgs { (Var $1, $3):$5 }
-        | var ':' Type { [(Var $1, $3)] }
+LamArgs : var ':' Type ',' LamArgs { ($1, $3):$5 }
+        | var ':' Type { [($1, $3)] }
 
 AppArgs : Exp ',' AppArgs { $1:$3 }
         | Exp { [$1] }
