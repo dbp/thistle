@@ -56,16 +56,19 @@ handle ctxt pth =
                 okHtml $ T.decodeUtf8 $ Blaze.toByteString b
            Right _ -> error "renderFile: parseHTML returned XML."
 
+noSources :: Text -> IO (Maybe (V, T))
+noSources = const (return Nothing)
+
 evalTemplateWithProg :: Text -> [X.Node] -> IO [X.Node]
 evalTemplateWithProg progtext ns =
-    let (env, tenv) =
+  do (env, tenv) <-
           if T.null progtext
-             then (emptyEnv, emptyTEnv)
-             else let prog = parse $ lexer $ T.unpack $ progtext <> " in () : {} { {} }"
-                      (TLam _ _, tenv') = tc False emptyTEnv prog
-                      (VLam env' _ _, _) = eval emptyEnv prog
-                   in (env', tenv')
-     in evalTemplate env tenv ns
+             then return (emptyEnv, emptyTEnv)
+             else do let prog = parse $ lexer $ T.unpack $ progtext <> " in () : {} { {} }"
+                         (TLam _ _, tenv') = tc False emptyTEnv prog
+                     (VLam env' _ _, _) <- eval noSources emptyEnv prog
+                     return (env', tenv')
+     evalTemplate env tenv ns
 
 
 evalTemplate :: Env -> TEnv -> [X.Node] -> IO [X.Node]
@@ -74,23 +77,23 @@ evalTemplate env tenv ns = (\(_,_,x) -> x) <$>
   where evalNode (env,tenv,ns) n@(X.Element t atrs cs) |
                    t == "show" &&
                    X.hasAttribute "e" n =
-          catch (let Just src = X.getAttribute "e" n
-                     prog = parse (lexer (T.unpack src))
-                     !t = tc False tenv prog
-                     (v,_) = eval env prog
-                 in return (env, tenv, ns ++ [X.TextNode (renderV v)]))
+          catch (do let Just src = X.getAttribute "e" n
+                        prog = parse (lexer (T.unpack src))
+                        !t = tc False tenv prog
+                    (v,_) <- eval noSources env prog
+                    return (env, tenv, ns ++ [X.TextNode (renderV v)]))
                 (\(e ::SomeException) ->
                    return (env, tenv, ns ++ [X.TextNode (T.pack (show e))]))
         evalNode (env,tenv,ns) n@(X.Element t atrs cs) |
                    t == "each" &&
                    X.hasAttribute "e" n  &&
                    X.hasAttribute "v" n =
-         catch (let Just src = X.getAttribute "e" n
-                    Just var = X.getAttribute "v" n
-                    prog = parse (lexer (T.unpack src))
-                    (TList t, _) = tc False tenv prog
-                    (v,_) = eval env prog
-                in case v of
+         catch (do let Just src = X.getAttribute "e" n
+                       Just var = X.getAttribute "v" n
+                       prog = parse (lexer (T.unpack src))
+                       (TList t, _) = tc False tenv prog
+                   (v,_) <- eval noSources env prog
+                   case v of
                      VList vs ->
                        foldM (\(env, tenv, ns) v ->
                           do ns' <- evalTemplate
@@ -107,12 +110,12 @@ evalTemplate env tenv ns = (\(_,_,x) -> x) <$>
                    t == "let" &&
                    X.hasAttribute "e" n  &&
                    X.hasAttribute "v" n =
-          do catch (let Just src = X.getAttribute "e" n
-                        Just var = X.getAttribute "v" n
-                        prog = parse (lexer (T.unpack src))
-                        !(t,_) = tc False tenv prog
-                        (v,_) = eval env prog
-                    in return (extendEnv env [(var, v)], extendTEnv tenv [( var, t)], ns))
+          do catch (do let Just src = X.getAttribute "e" n
+                           Just var = X.getAttribute "v" n
+                           prog = parse (lexer (T.unpack src))
+                           !(t,_) = tc False tenv prog
+                       (v,_) <- eval noSources env prog
+                       return (extendEnv env [(var, v)], extendTEnv tenv [( var, t)], ns))
                    (\(e ::SomeException) ->
                       return (env, tenv, ns ++ [X.TextNode (T.pack (show e))]))
         evalNode (env,tenv,ns) (X.Element t atrs cs) =

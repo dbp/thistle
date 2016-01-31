@@ -18,47 +18,47 @@ main = hspec $ do
   describe "eval" $ do
     describe "constants" $ do
       it "ints" $
-        eval emptyEnv (EInt 10) `shouldBe` (VInt 10, [])
+        eval noSources emptyEnv (EInt 10) `shouldReturn` (VInt 10, [])
       it "doubles" $
-        eval emptyEnv (EDouble 10) `shouldBe` (VDouble 10, [])
+        eval noSources emptyEnv (EDouble 10) `shouldReturn` (VDouble 10, [])
       it "strings" $
-        eval emptyEnv (EString "hello") `shouldBe` (VString "hello", [])
+        eval noSources emptyEnv (EString "hello") `shouldReturn` (VString "hello", [])
       it "bools" $
-        eval emptyEnv (EBool True) `shouldBe` (VBool True, [])
+        eval noSources emptyEnv (EBool True) `shouldReturn` (VBool True, [])
       it "lists" $
-        eval emptyEnv (EList TInt [EInt 1, EInt 2])
-           `shouldBe` (VList [VInt 1, VInt 2], [])
+        eval noSources emptyEnv (EList TInt [EInt 1, EInt 2])
+           `shouldReturn` (VList [VInt 1, VInt 2], [])
       it "objects" $
-        eval emptyEnv (EObject (M.fromList [("k", EInt 2),("l", EInt 3)]))
-           `shouldBe` (VObject (M.fromList [("k", VInt 2),("l", VInt 3)]), [])
+        eval noSources emptyEnv (EObject (M.fromList [("k", EInt 2),("l", EInt 3)]))
+           `shouldReturn` (VObject (M.fromList [("k", VInt 2),("l", VInt 3)]), [])
     describe "vars, let, lams, and application" $ do
       it "lookup" $
-        eval (envFromList [("x", VInt 10)]) (EVar ("x"))
-          `shouldBe` (VInt 10, [])
+        eval noSources (envFromList [("x", VInt 10)]) (EVar ("x"))
+          `shouldReturn` (VInt 10, [])
       it "applying one argument functions" $
-        eval emptyEnv (EApp (ELam [("x", TInt)] TInt (EVar ("x"))) [EInt 10])
-             `shouldBe` (VInt 10, [])
+        eval noSources emptyEnv (EApp (ELam [("x", TInt)] TInt (EVar ("x"))) [EInt 10])
+             `shouldReturn` (VInt 10, [])
       it "applying two argument functions" $
-        eval emptyEnv (EApp (ELam [("x", TInt), ("y", TInt)] TInt (EVar ("x"))) [EInt 10, EInt 20])
-             `shouldBe` (VInt 10, [])
+        eval noSources emptyEnv (EApp (ELam [("x", TInt), ("y", TInt)] TInt (EVar ("x"))) [EInt 10, EInt 20])
+             `shouldReturn` (VInt 10, [])
       it "applying closures" $
-        eval (envFromList [("f", VLam emptyEnv ["x"] (EVar ("x")))])
+        eval noSources (envFromList [("f", VLam emptyEnv ["x"] (EVar ("x")))])
              (EApp (EVar ("f")) [EInt 10])
-             `shouldBe` (VInt 10, [])
+             `shouldReturn` (VInt 10, [])
       it "let binding" $
-        eval emptyEnv (ELet ("x") (EInt 1) (EVar ("x")))
-             `shouldBe` (VInt 1, [])
+        eval noSources emptyEnv (ELet ("x") (EInt 1) (EVar ("x")))
+             `shouldReturn` (VInt 1, [])
       it "let shadowing existing vars in env" $
-        eval (envFromList [("x", VInt 10)])
+        eval noSources (envFromList [("x", VInt 10)])
              (ELet ("x") (EInt 1) (EVar ("x")))
-             `shouldBe` (VInt 1, [])
+             `shouldReturn` (VInt 1, [])
       it "let shadowing let" $
-        eval emptyEnv
+        eval noSources emptyEnv
              (ELet ("x") (EInt 2)
                              (ELet ("x") (EInt 1) (EVar ("x"))))
-             `shouldBe` (VInt 1, [])
+             `shouldReturn` (VInt 1, [])
       it "let should be recursive" $
-         eval emptyEnv
+         eval noSources emptyEnv
               (ELet ("f") (ELam [("x", TList TInt)] TInt
                                     (ECase (EVar ("x"))
                                            (EInt 0)
@@ -70,93 +70,93 @@ main = hspec $ do
                                                EApp (EVar ("f"))
                                                     [EVar ("rest")]])))
                     (EApp (EVar ("f")) [EList TInt [EInt 0, EInt 0, EInt 0]]))
-              `shouldBe` (VInt 3, [])
+              `shouldReturn` (VInt 3, [])
     describe "if, case, and dot" $ do
       it "if true" $
-        eval emptyEnv (EIf (EBool True) (EInt 1) (EInt 2))
-             `shouldBe` (VInt 1, [])
+        eval noSources emptyEnv (EIf (EBool True) (EInt 1) (EInt 2))
+             `shouldReturn` (VInt 1, [])
       it "if false" $
-        eval emptyEnv (EIf (EBool False) (EInt 1) (EInt 2))
-             `shouldBe` (VInt 2, [])
+        eval noSources emptyEnv (EIf (EBool False) (EInt 1) (EInt 2))
+             `shouldReturn` (VInt 2, [])
       it "case on empty lists" $
-        eval emptyEnv (ECase (EList TInt []) (EInt 1) "h" "t" (EInt 2))
-             `shouldBe` (VInt 1, [])
+        eval noSources emptyEnv (ECase (EList TInt []) (EInt 1) "h" "t" (EInt 2))
+             `shouldReturn` (VInt 1, [])
       it "case on non-empty list" $
-        eval emptyEnv (ECase (EList TInt [EInt 1]) (EInt 1) "h" "t" (EInt 2))
-             `shouldBe` (VInt 2, [])
+        eval noSources emptyEnv (ECase (EList TInt [EInt 1]) (EInt 1) "h" "t" (EInt 2))
+             `shouldReturn` (VInt 2, [])
       it "case on non-empty, using head" $
-        eval emptyEnv (ECase (EList TInt [EInt 3]) (EInt 1) "h" "t" (EVar "h"))
-             `shouldBe` (VInt 3, [])
+        eval noSources emptyEnv (ECase (EList TInt [EInt 3]) (EInt 1) "h" "t" (EVar "h"))
+             `shouldReturn` (VInt 3, [])
       it "case on non-empty, using tail" $
-        eval emptyEnv (ECase (EList TInt [EInt 2, EInt 3]) (EInt 1) "h" "t" (EVar "t"))
-             `shouldBe` (VList [VInt 3] , [])
+        eval noSources emptyEnv (ECase (EList TInt [EInt 2, EInt 3]) (EInt 1) "h" "t" (EVar "t"))
+             `shouldReturn` (VList [VInt 3] , [])
       it "dot on object should get field" $
-        eval emptyEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "x")
-             `shouldBe` (VInt 1, [])
+        eval noSources emptyEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "x")
+             `shouldReturn` (VInt 1, [])
     describe "prims" $ do
       it "+ on ints" $
-        eval emptyEnv (EPrim PPlus [EInt 1, EInt 1])
-             `shouldBe` (VInt 2, [])
+        eval noSources emptyEnv (EPrim PPlus [EInt 1, EInt 1])
+             `shouldReturn` (VInt 2, [])
       it "+ on doubles" $
-        eval emptyEnv (EPrim PPlus [EDouble 1, EDouble 1])
-             `shouldBe` (VDouble 2, [])
+        eval noSources emptyEnv (EPrim PPlus [EDouble 1, EDouble 1])
+             `shouldReturn` (VDouble 2, [])
       it "+ on strings" $
-        eval emptyEnv (EPrim PPlus [EString "a", EString "b"])
-             `shouldBe` (VString "ab", [])
+        eval noSources emptyEnv (EPrim PPlus [EString "a", EString "b"])
+             `shouldReturn` (VString "ab", [])
       it "* on ints" $
-        eval emptyEnv (EPrim PTimes [EInt 2, EInt 3])
-             `shouldBe` (VInt 6, [])
+        eval noSources emptyEnv (EPrim PTimes [EInt 2, EInt 3])
+             `shouldReturn` (VInt 6, [])
       it "* on doubles" $
-        eval emptyEnv (EPrim PTimes [EDouble 2, EDouble 3])
-             `shouldBe` (VDouble 6, [])
+        eval noSources emptyEnv (EPrim PTimes [EDouble 2, EDouble 3])
+             `shouldReturn` (VDouble 6, [])
       it "- on ints" $
-        eval emptyEnv (EPrim PMinus [EInt 2, EInt 3])
-             `shouldBe` (VInt (-1), [])
+        eval noSources emptyEnv (EPrim PMinus [EInt 2, EInt 3])
+             `shouldReturn` (VInt (-1), [])
       it "- on doubles" $
-        eval emptyEnv (EPrim PMinus [EDouble 2, EDouble 3])
-             `shouldBe` (VDouble (-1), [])
+        eval noSources emptyEnv (EPrim PMinus [EDouble 2, EDouble 3])
+             `shouldReturn` (VDouble (-1), [])
       it "/ on int" $
-        eval emptyEnv (EPrim PDivide [EInt 4, EInt 2])
-             `shouldBe` (VInt 2, [])
+        eval noSources emptyEnv (EPrim PDivide [EInt 4, EInt 2])
+             `shouldReturn` (VInt 2, [])
       it "/ on doubles" $
-        eval emptyEnv (EPrim PDivide [EDouble 3, EDouble 2])
-             `shouldBe` (VDouble 1.5, [])
+        eval noSources emptyEnv (EPrim PDivide [EDouble 3, EDouble 2])
+             `shouldReturn` (VDouble 1.5, [])
       it "== on ints" $ do
-        eval emptyEnv (EPrim PEquals [EInt 1, EInt 1])
-             `shouldBe` (VBool True, [])
-        eval emptyEnv (EPrim PEquals [EInt 1, EInt 2])
-             `shouldBe` (VBool False, [])
+        eval noSources emptyEnv (EPrim PEquals [EInt 1, EInt 1])
+             `shouldReturn` (VBool True, [])
+        eval noSources emptyEnv (EPrim PEquals [EInt 1, EInt 2])
+             `shouldReturn` (VBool False, [])
       it "== on doubles" $ do
-        eval emptyEnv (EPrim PEquals [EDouble 1, EDouble 1])
-             `shouldBe` (VBool True, [])
-        eval emptyEnv (EPrim PEquals [EDouble 1, EDouble 2])
-             `shouldBe` (VBool False, [])
+        eval noSources emptyEnv (EPrim PEquals [EDouble 1, EDouble 1])
+             `shouldReturn` (VBool True, [])
+        eval noSources emptyEnv (EPrim PEquals [EDouble 1, EDouble 2])
+             `shouldReturn` (VBool False, [])
       it "== on strings" $ do
-        eval emptyEnv (EPrim PEquals [EString "a", EString "a"])
-             `shouldBe` (VBool True, [])
-        eval emptyEnv (EPrim PEquals [EString "", EString "a"])
-             `shouldBe` (VBool False, [])
+        eval noSources emptyEnv (EPrim PEquals [EString "a", EString "a"])
+             `shouldReturn` (VBool True, [])
+        eval noSources emptyEnv (EPrim PEquals [EString "", EString "a"])
+             `shouldReturn` (VBool False, [])
       it "== on lists" $ do
-        eval emptyEnv (EPrim PEquals [EList TInt [EInt 1], EList TInt [EInt 1]])
-             `shouldBe` (VBool True, [])
-        eval emptyEnv (EPrim PEquals [EList TInt [], EList TInt [EInt 1]])
-             `shouldBe` (VBool False, [])
+        eval noSources emptyEnv (EPrim PEquals [EList TInt [EInt 1], EList TInt [EInt 1]])
+             `shouldReturn` (VBool True, [])
+        eval noSources emptyEnv (EPrim PEquals [EList TInt [], EList TInt [EInt 1]])
+             `shouldReturn` (VBool False, [])
       it "== on objects" $ do
-        eval emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1)]), EObject (M.fromList [("x", EInt 1)])])
-             `shouldBe` (VBool True, [])
-        eval emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1), ("y", EInt 2)]), EObject (M.fromList [("y", EInt 2), ("x", EInt 1)])])
-             `shouldBe` (VBool True, [])
-        eval emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1), ("y", EInt 2)]), EObject (M.fromList [("y", EInt 2)])])
-             `shouldBe` (VBool False, [])
+        eval noSources emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1)]), EObject (M.fromList [("x", EInt 1)])])
+             `shouldReturn` (VBool True, [])
+        eval noSources emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1), ("y", EInt 2)]), EObject (M.fromList [("y", EInt 2), ("x", EInt 1)])])
+             `shouldReturn` (VBool True, [])
+        eval noSources emptyEnv (EPrim PEquals [EObject (M.fromList [("x", EInt 1), ("y", EInt 2)]), EObject (M.fromList [("y", EInt 2)])])
+             `shouldReturn` (VBool False, [])
 
     describe "sources" $ do
       it "sources should produce their default values" $
-        eval emptyEnv (ESource (ES (Id "1") TInt) (EInt 10))
-             `shouldBe` (VInt 10, [VSBase (Id "1") [] (VInt 10)])
+        eval noSources emptyEnv (ESource (ES (Id "1") TInt) (EInt 10))
+             `shouldReturn` (VInt 10, [VSBase (Id "1") [] (VInt 10)])
       it "should be able to add sources of ints" $
-        eval emptyEnv (EPrim PPlus [EInt 1
+        eval noSources emptyEnv (EPrim PPlus [EInt 1
                                    ,ESource (ES (Id "1") TInt) (EInt 10)])
-             `shouldBe` (VInt 11, [VSBase (Id "1") [] (VInt 10)])
+             `shouldReturn` (VInt 11, [VSBase (Id "1") [] (VInt 10)])
   describe "tc" $ do
     let shouldTypeAs e t = fst (tc False emptyTEnv e) `shouldBe` t
     describe "constants" $ do

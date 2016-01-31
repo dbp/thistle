@@ -9,6 +9,7 @@ recomputation.
 
 -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TupleSections     #-}
 
 module Lang where
@@ -230,63 +231,68 @@ haslam (TList t) = haslam t
 haslam (TObject m) = any haslam (M.elems m)
 haslam _ = False
 
-eval :: Env -> E -> (V, [VS])
-eval _env (EInt n)         = (VInt n, [])
-eval _env (EDouble d)      = (VDouble d, [])
-eval _env (EBool b)        = (VBool b, [])
-eval _env (EString t)      = (VString t, [])
-eval env (EList _ es)        = let vs = map (eval env) es
-                               in (VList (map fst vs), concatMap snd vs)
-eval env (EObject fs)      =
-  let vs = M.map (eval env) fs
-  in (VObject (M.map fst vs), concat $ M.map snd vs)
-eval (Env env) (EVar v)    =
+eval :: (Text -> IO (Maybe (V, T))) -> Env -> E -> IO (V, [VS])
+eval gs _env (EInt n)     = return (VInt n, [])
+eval gs _env (EDouble d)  = return (VDouble d, [])
+eval gs _env (EBool b)    = return (VBool b, [])
+eval gs _env (EString t)  = return (VString t, [])
+eval gs env (EList _ es)  = do vs <- mapM (eval gs env) es
+                               return (VList (map fst vs), concatMap snd vs)
+eval gs env (EObject fs)  =
+  do vs' <- mapM (\(k,v) -> do v' <- eval gs env v
+                               return (k, v'))
+                 (M.assocs fs)
+     let vs = M.fromList vs'
+     return (VObject (M.map fst vs), concat $ M.map snd vs)
+eval gs (Env env) (EVar v)    =
   case M.lookup v env of
     Nothing -> error $ "Could not find " <> show v <> " in env " <> show env
-    Just v' -> (v', [])
-eval env (ELam vs _ e)     = (VLam env (map fst vs) e, [])
-eval env (EApp e es)       =
-  case eval env e of
-    (lam@(VLam venv vs body), sources) ->
-      if length vs == length es
-         then let args = map (eval env) es
-                  res = eval (extendEnv venv (zip vs (map fst args))) body
-              in (fst res, snd res <> concatMap snd args <> sources)
-         else error $ "Wrong number of arguments to lambda " <> show lam <> ". Expected " <> show vs <> ", got" <> show es <> "."
-    l -> error $ "Applying a non-lambda " <> show l <> " to arguments " <> show es
-eval env (EIf c t e)       =
-  let v = eval env c
-  in case fst v of
-       VBool True -> let v2 = eval env t
-                     in (fst v2, snd v <> snd v2)
-       VBool False -> let v2 = eval env e
-                      in (fst v2, snd v <> snd v2)
+    Just v' -> return (v', [])
+eval gs env (ELam vs _ e)     = return (VLam env (map fst vs) e, [])
+eval gs env (EApp e es)       =
+  do fv <- eval gs env e
+     case fv of
+       (lam@(VLam venv vs body), sources) ->
+         if length vs == length es
+            then do args <- mapM (eval gs env) es
+                    res <- eval gs (extendEnv venv (zip vs (map fst args))) body
+                    return (fst res, snd res <> concatMap snd args <> sources)
+            else error $ "Wrong number of arguments to lambda " <> show lam <> ". Expected " <> show vs <> ", got" <> show es <> "."
+       l -> error $ "Applying a non-lambda " <> show l <> " to arguments " <> show es
+eval gs env (EIf c t e)       =
+  do v <- eval gs env c
+     case fst v of
+       VBool True -> do v2 <- eval gs env t
+                        return (fst v2, snd v <> snd v2)
+       VBool False -> do v2 <- eval gs env e
+                         return (fst v2, snd v <> snd v2)
        _ -> error $ "Non-boolean in if: " <> show c
-eval env (ECase e n h t s) =
-  let v = eval env e
-  in case fst v of
-       VList [] -> let v2 = eval env n
-                   in (fst v2, snd v <> snd v2)
-       VList (x:xs) -> let v2 = eval (extendEnv env [(h, x),(t, VList xs)]) s
-                       in (fst v2, snd v <> snd v2)
+eval gs env (ECase e n h t s) =
+  do v <- eval gs env e
+     case fst v of
+       VList [] -> do v2 <- eval gs env n
+                      return (fst v2, snd v <> snd v2)
+       VList (x:xs) -> do v2 <- eval gs (extendEnv env [(h, x),(t, VList xs)]) s
+                          return (fst v2, snd v <> snd v2)
        _ -> error $ "Non-list in case: " <> show e
-eval env (EDot e f)        = let v = eval env e
-                             in case fst v of
-                                  VObject fs -> (fs M.! f, snd v)
-                                  _ -> error $ "Non-object in dot: " <> show e
-eval env (ELet var e b)    =
+eval gs env (EDot e f) = do v <- eval gs env e
+                            case fst v of
+                               VObject fs -> return (fs M.! f, snd v)
+                               _ -> error $ "Non-object in dot: " <> show e
+eval gs env (ELet var e b)    =
   -- NOTE(dbp 2015-12-26): I haven't thought through this recursion
   -- very well. It _seems_ plausible, because we are using it to
   -- implement recursion (so anywhere it'll cause divergence,
   -- presumably the looping should have happened).
-  let v  = eval (extendEnv env [(var, fst v)]) e
-      v' = eval (extendEnv env [(var, fst v)]) b
-  in (fst v', snd v <> snd v')
-eval env (EPrim p es)      =
-  let vs' = map (eval env) es
-      vs  = map fst vs'
-      ss  = concatMap snd vs'
-  in case p of
+  do rec v <- eval gs (extendEnv env [(var, fst v)]) e
+     v' <- eval gs (extendEnv env [(var, fst v)]) b
+     return (fst v', snd v <> snd v')
+eval gs env (EPrim p es)      =
+  do vs' <- mapM (eval gs env) es
+     let vs = map fst vs'
+     let ss = concatMap snd vs'
+     return $
+      case p of
        PPlus -> case vs of
                   [VInt a, VInt b] -> (VInt (a + b), ss)
                   [VDouble a, VDouble b] -> (VDouble (a + b), ss)
@@ -309,6 +315,6 @@ eval env (EPrim p es)      =
                     [_, VLam _ _ _] -> error "==: can't compare functions."
                     [v1, v2] -> (VBool (v1 == v2), ss)
                     _ -> error $ "==: didn't get two arguments, got: " <> show vs
-eval env (ESource (ES id' _t) def)      =
-  let v = eval env def
-  in (fst v, snd v <> [VSBase id' [] (fst v)])
+eval gs env (ESource (ES id' _t) def)      =
+  do v <- eval gs env def
+     return (fst v, snd v <> [VSBase id' [] (fst v)])
