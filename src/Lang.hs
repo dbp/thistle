@@ -231,7 +231,7 @@ haslam (TList t) = haslam t
 haslam (TObject m) = any haslam (M.elems m)
 haslam _ = False
 
-eval :: (Text -> IO (Maybe (V, T))) -> Env -> E -> IO (V, [VS])
+eval :: (Id -> IO (Maybe (V, T))) -> Env -> E -> IO (V, [VS])
 eval gs _env (EInt n)     = return (VInt n, [])
 eval gs _env (EDouble d)  = return (VDouble d, [])
 eval gs _env (EBool b)    = return (VBool b, [])
@@ -315,6 +315,11 @@ eval gs env (EPrim p es)      =
                     [_, VLam _ _ _] -> error "==: can't compare functions."
                     [v1, v2] -> (VBool (v1 == v2), ss)
                     _ -> error $ "==: didn't get two arguments, got: " <> show vs
-eval gs env (ESource (ES id' _t) def)      =
-  do v <- eval gs env def
-     return (fst v, snd v <> [VSBase id' [] (fst v)])
+eval gs env (ESource (ES id' t') def)      =
+  do existing <- gs id'
+     case existing of
+       Just (v, t) | t == t' ->
+         return (v, [VSBase id' [] v])
+       _ -> do
+         v <- eval gs env def
+         return (fst v, snd v <> [VSBase id' [] (fst v)])

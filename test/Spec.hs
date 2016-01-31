@@ -457,3 +457,14 @@ main = hspec $ do
     shouldRenderWith "<each e='[[1,2:int],[3,4:int]:[int]]' v='x'><each e='x' v='y'><show e='y'/></each></each>" "" "1234"
     shouldRenderWith "<let e='\"hello\"' v='msg'/><show e='msg'/>" "" "hello"
     shouldRenderWith "<let e='obj.l' v='l'/><each e='l' v='elem'><show e='elem'/></each>" "obj = {l: [1,2,3:int]}" "123"
+  describe "eval with source loading" $ do
+    it "should look up value" $
+       eval (const (return $ Just (VInt 20, TInt)))
+            emptyEnv
+            (ESource (ES (Id "1") TInt) (EInt 10))
+             `shouldReturn` (VInt 20, [VSBase (Id "1") [] (VInt 20)])
+    it "if type is wrong, should ignore value" $
+       eval (const (return $ Just (VInt 20, TInt)))
+            emptyEnv
+            (ESource (ES (Id "1") TString) (EString "foo"))
+             `shouldReturn` (VString "foo", [VSBase (Id "1") [] (VString "foo")])

@@ -56,7 +56,7 @@ handle ctxt pth =
                 okHtml $ T.decodeUtf8 $ Blaze.toByteString b
            Right _ -> error "renderFile: parseHTML returned XML."
 
-noSources :: Text -> IO (Maybe (V, T))
+noSources :: Id -> IO (Maybe (V, T))
 noSources = const (return Nothing)
 
 evalTemplateWithProg :: Text -> [X.Node] -> IO [X.Node]
