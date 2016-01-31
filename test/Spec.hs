@@ -455,3 +455,4 @@ main = hspec $ do
     shouldRenderWith "<show e='f(10) + 1'/>" "f = (x:int):int { x + 1 }" "12"
     shouldRenderWith "<each e='[1,2,3:int]' v='x'><show e='x'/></each>" "" "123"
     shouldRenderWith "<each e='[[1,2:int],[3,4:int]:[int]]' v='x'><each e='x' v='y'><show e='y'/></each></each>" "" "1234"
+    shouldRenderWith "<let e='\"hello\"' v='msg'/><show e='msg'/>" "" "hello"
