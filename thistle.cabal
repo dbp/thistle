@@ -33,6 +33,9 @@ library
                  , blaze-builder
                  , directory
                  , lens
+                 , hedis
+                 , binary
+                 , bytestring
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-unused-do-bind
@@ -51,6 +54,9 @@ executable thistle-bin
                  , blaze-builder
                  , directory
                  , lens
+                 , hedis
+                 , binary
+                 , bytestring
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-unused-do-bind
@@ -72,4 +78,7 @@ Test-Suite test-thistle
                , blaze-builder
                , directory
                , lens
+               , hedis
+               , binary
+               , bytestring
                , hspec

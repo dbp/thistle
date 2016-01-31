@@ -8,18 +8,23 @@ its result. This is used for out-of-language mutation and then
 recomputation.
 
 -}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TupleSections     #-}
 
+
 module Lang where
 
-import           Data.List   (nub)
-import qualified Data.Map    as M
-import           Data.Maybe  (fromMaybe)
-import           Data.Monoid ((<>))
-import           Data.Text   (Text)
-import qualified Data.Text   as T
+import           Data.Binary
+import           Data.List    (nub)
+import qualified Data.Map     as M
+import           Data.Maybe   (fromMaybe)
+import           Data.Monoid  ((<>))
+import           Data.Text    (Text)
+import qualified Data.Text    as T
+import           GHC.Generics (Generic)
+
 
 data T = TInt
        | TDouble
@@ -28,7 +33,9 @@ data T = TInt
        | TList !T
        | TObject !(M.Map Text T)
        | TLam ![T] !T
-       deriving (Show, Eq)
+       deriving (Show, Eq, Generic)
+
+instance Binary T
 
 renderT :: T -> Text
 renderT TInt = "int"
@@ -44,7 +51,9 @@ data Prim = PPlus
           | PMinus
           | PDivide
           | PEquals
-          deriving (Show, Eq)
+          deriving (Show, Eq, Generic)
+
+instance Binary Prim
 
 data E = EInt Int
        | EDouble Double
@@ -61,11 +70,17 @@ data E = EInt Int
        | ELet Text E E
        | EPrim Prim [E]
        | ESource ES E
-       deriving (Show, Eq)
+       deriving (Show, Eq, Generic)
 
-data ES = ES Id T deriving (Show, Eq)
+instance Binary E
 
-data Env = Env (M.Map Text V) deriving (Show, Eq)
+data ES = ES Id T deriving (Show, Eq, Generic)
+
+instance Binary ES
+
+data Env = Env (M.Map Text V) deriving (Show, Eq, Generic)
+
+instance Binary Env
 
 emptyEnv :: Env
 emptyEnv = Env M.empty
@@ -91,7 +106,9 @@ data V = VInt Int
        | VList [V]
        | VObject (M.Map Text V)
        | VLam Env [Text] E
-       deriving (Show, Eq)
+       deriving (Show, Eq, Generic)
+
+instance Binary V
 
 renderV :: V -> Text
 renderV (VInt n) = T.pack (show n)
@@ -108,7 +125,9 @@ data VS = VSBase Id [UserId] V
         | VSObject Id [UserId] (M.Map Text VS)
         deriving (Show, Eq)
 
-data Id = Id Text deriving (Show, Eq)
+data Id = Id Text deriving (Show, Eq, Generic)
+
+instance Binary Id
 
 data UserId = UserId Int deriving (Show, Eq)
 

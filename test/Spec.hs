@@ -13,6 +13,11 @@ import           Lang
 import           Lexer
 import           Web
 
+
+noSources :: Id -> IO (Maybe (V, T))
+noSources = const (return Nothing)
+
+
 main :: IO ()
 main = hspec $ do
   describe "eval" $ do

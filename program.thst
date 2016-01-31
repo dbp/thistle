@@ -1,2 +1,4 @@
 x = 10
 y = (z : int) : int { z * 2 }
+
+name = source<name;string;"anonymous">
