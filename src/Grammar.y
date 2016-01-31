@@ -35,6 +35,8 @@ import Lang
       var             { TokenVar $$ }
       string          { TokenString $$ }
       tint            { TokenTInt }
+      tdouble         { TokenTDouble }
+      tbool           { TokenTBool }
       tstring         { TokenTString }
       '.'             { TokenDot }
       ','             { TokenComma }
@@ -61,8 +63,8 @@ Exp   : int  { EInt $1 }
       | string { EString $1 }
       | '[' ':' Type ']' { EList $3 [] }
       | '[' ListElems ':' Type ']' { EList $4 $2 }
-      | '(' ')' '{' Exp '}' { ELam [] $4 }
-      | '(' LamArgs ')' '{' Exp '}' { ELam $2 $5 }
+      | '(' ')' ':' Type '{' Exp '}' { ELam [] $4 $6 }
+      | '(' LamArgs ')' ':' Type '{' Exp '}' { ELam $2 $5 $7 }
       | Exp '(' ')' { EApp $1 [] }
       | Exp '(' AppArgs ')' { EApp $1 $3 }
       | '{' '}' { EObject M.empty }
@@ -96,6 +98,8 @@ ObjectFields : var ':' Exp ',' ObjectFields { ($1,$3):$5 }
 
 Type : tint { TInt }
      | tstring { TString }
+     | tbool { TBool }
+     | tdouble { TDouble }
      | '[' Type ']' { TList $2 }
      | '->' Type { TLam [] $2 }
      | ArrowArgs '->' Type { TLam $1 $3 }
@@ -106,5 +110,5 @@ ArrowArgs : Type ',' ArrowArgs { $1:$3 }
 {
 
 parseError :: [Token] -> a
-parseError _ = error "Parse error"
+parseError s = error $ "Parse error at: " ++ unwords (map renderToken s)
 }

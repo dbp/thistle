@@ -1,2 +1,2 @@
 x = 10
-y = (z : int) { z * 2 }
+y = (z : int) : int { z * 2 }

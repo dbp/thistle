@@ -28,6 +28,15 @@ data T = TInt
        | TLam ![T] !T
        deriving (Show, Eq)
 
+renderT :: T -> Text
+renderT TInt = "int"
+renderT TDouble = "double"
+renderT TBool = "bool"
+renderT TString = "string"
+renderT (TList t) = "[" <> renderT t <> "]"
+renderT (TObject fs) = "{" <> T.intercalate "," (map (\(k, v) -> k <> ": " <> renderT v) (M.assocs fs)) <> "}"
+renderT (TLam as r) = T.intercalate ", " (map renderT as) <> " -> " <> renderT r
+
 data Var = Var Text deriving (Show, Eq, Ord)
 
 data Prim = PPlus
@@ -44,7 +53,7 @@ data E = EInt Int
        | EList T [E]
        | EObject (M.Map Text E)
        | EVar Var
-       | ELam [(Var, T)] E
+       | ELam [(Var, T)] T E
        | EApp E [E]
        | EIf E E E
        | ECase E E Var Var E
@@ -106,56 +115,60 @@ data UserId = UserId Int deriving (Show, Eq)
 type SourceResolver = VS -> IO (Maybe V)
 
 
-tc :: TEnv -> E -> T
-tc _ (EInt _)                    = TInt
-tc _ (EDouble _)                 = TDouble
-tc _ (EBool _)                   = TBool
-tc _ (EString _)                 = TString
-tc env (EList t es)                =
-  case nub $ map (tc env) es of
+tc :: Bool -> TEnv -> E -> T
+tc _ _ (EInt _)                    = TInt
+tc _ _ (EDouble _)                 = TDouble
+tc _ _ (EBool _)                   = TBool
+tc _ _ (EString _)                 = TString
+tc _ env (EList t es)                =
+  case nub $ map (tc False env) es of
     [] -> TList t
     [t'] | t == t' -> TList t
     [t']  -> error $ "tc: List elements don't have type of annotation. Annotation was " <> show t <> " but elements have type " <> show t'
     ts -> error $ "tc: Found list with different sorts of elements in it: " <> show ts
-tc env (EObject fs)              = TObject $ M.map (tc env) fs
-tc (TEnv env) (EVar v)           = fromMaybe (error $ "tc: Unbound identifier " <> show v) (M.lookup v env)
-tc env (ELam vs e)               =
-  TLam (map snd vs) (tc (extendTEnv env vs) e)
-tc env (EApp e es)               = case tc env e of
-                                     TLam ts t -> let as = map (tc env) es in
-                                                      if as == ts
-                                                         then t
-                                                         else error $ "tc: Arguments did not match types expected by lambda. Expected " <> show ts <> " but got " <> show as
-                                     t -> error $ "tc: Got non-function type in application: " <> show t
-tc env (EIf c t e)               = case tc env c of
-                                     TBool -> let tt = tc env t
-                                                  te = tc env e
-                                              in if tt == te
-                                                    then tt
-                                                    else error $ "tc: if had different types in the then and else branches: " <> show tt <> " and " <> show te
-                                     t' -> error $ "tc: Got non-boolean in if test: " <> show t'
-tc env (ECase e n h t s)         = let v = tc env e
-                                   in case v of
-                                        TList te ->
-                                          let tnull = tc env n
-                                              tcons = tc (extendTEnv env [(h, te), (t, TList te)]) s
-                                          in if tnull == tcons
-                                                then tnull
-                                                else error $ "tc: null and cons branch of case did not have the same type: " <> show tnull <> " and " <> show tcons
-                                        twrong -> error $ "tc: Got non-list in case: " <> show twrong
-tc env (EDot e f)                =
-  case tc env e of
+tc _ env (EObject fs)              = TObject $ M.map (tc False env) fs
+tc _ (TEnv env) (EVar v)           = fromMaybe (error $ "tc: Unbound identifier " <> show v) (M.lookup v env)
+tc shallow env (ELam vs rt e)      =
+  if shallow
+     then TLam (map snd vs) rt
+     else let bt = tc False (extendTEnv env vs) e
+          in if bt == rt then TLam (map snd vs) bt else error $ "tc: expected return type of function to be " <> show rt <> ", but got " <> show bt <> " instead."
+tc _ env (EApp e es)  = case tc False env e of
+                          TLam ts t -> let as = map (tc False env) es in
+                                           if as == ts
+                                              then t
+                                              else error $ "tc: Arguments did not match types expected by lambda. Expected " <> show ts <> " but got " <> show as
+                          t -> error $ "tc: Got non-function type in application: " <> show t
+tc _ env (EIf c t e) = case tc False env c of
+                         TBool -> let tt = tc False env t
+                                      te = tc False env e
+                                  in if tt == te
+                                        then tt
+                                        else error $ "tc: if had different types in the then and else branches: " <> show tt <> " and " <> show te
+                         t' -> error $ "tc: Got non-boolean in if test: " <> show t'
+tc _ env (ECase e n h t s)         =
+  let v = tc False env e
+  in case v of
+       TList te ->
+         let tnull = tc False env n
+             tcons = tc False (extendTEnv env [(h, te), (t, TList te)]) s
+         in if tnull == tcons
+               then tnull
+               else error $ "tc: null and cons branch of case did not have the same type: " <> show tnull <> " and " <> show tcons
+       twrong -> error $ "tc: Got non-list in case: " <> show twrong
+tc _ env (EDot e f)                =
+  case tc False env e of
     to@(TObject fs) ->
       case M.lookup f fs of
         Just t -> t
         Nothing -> error $ "tc: field " <> show f <> " not found on object: " <> show to
     t -> error $ "tc: got non-object in dot: " <> show t
-tc env (ELet var e b)            = let t = tc env e
-                                   in tc (extendTEnv env [(var, t)]) b
-tc env (EPrim p es)              =
+tc _ env (ELet var e b)            = let t = tc True env e
+                                     in tc False (extendTEnv env [(var, t)]) b
+tc _ env (EPrim p es)              =
   case p of
     PPlus ->
-      case map (tc env) es of
+      case map (tc False env) es of
         [TInt, TInt] -> TInt
         [TInt, o] -> error $ "tc: Can't mix + with TInt and " <> show o
         [o, TInt] -> error $ "tc: Can't mix + with TInt and " <> show o
@@ -168,7 +181,7 @@ tc env (EPrim p es)              =
         [a,b] -> error $ "tc: Invalid arguments to +: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to +."
     PMinus ->
-      case map (tc env) es of
+      case map (tc False env) es of
         [TInt, TInt] -> TInt
         [TInt, o] -> error $ "tc: Can't mix - with TInt and " <> show o
         [o, TInt] -> error $ "tc: Can't mix - with TInt and " <> show o
@@ -178,7 +191,7 @@ tc env (EPrim p es)              =
         [a,b] -> error $ "tc: Invalid arguments to -: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to -."
     PTimes ->
-      case map (tc env) es of
+      case map (tc False env) es of
         [TInt, TInt] -> TInt
         [TInt, o] -> error $ "tc: Can't mix * with TInt and " <> show o
         [o, TInt] -> error $ "tc: Can't mix * with TInt and " <> show o
@@ -188,7 +201,7 @@ tc env (EPrim p es)              =
         [a,b] -> error $ "tc: Invalid arguments to *: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to *."
     PDivide ->
-      case map (tc env) es of
+      case map (tc False env) es of
         [TInt, TInt] -> TInt
         [TInt, o] -> error $ "tc: Can't mix / with TInt and " <> show o
         [o, TInt] -> error $ "tc: Can't mix / with TInt and " <> show o
@@ -198,16 +211,16 @@ tc env (EPrim p es)              =
         [a,b] -> error $ "tc: Invalid arguments to /: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to /."
     PEquals ->
-      case map (tc env) es of
+      case map (tc False env) es of
         [t1, t2] | t1 == t2 && notLam t1 -> TBool
           where notLam (TLam _ _) = False
                 notLam _ = True
         [a,b] -> error $ "tc: Invalid arguments to ==: " <> show a <> " and " <> show b
         _ -> error "tc: Need two arguments to ==."
 
-tc env (ESource (ES _id t) def) =
+tc _ env (ESource (ES _id t) def) =
   if haslam t then error $ "tc: Sources cannot contain functions. Found one in type: " <> show t
-  else let tv = tc env def
+  else let tv = tc False env def
   in if tv == t
         then t
         else error $ "tc: Default value of source doesn't have type of source. Expected " <> show t <> " but got " <> show tv
@@ -232,7 +245,7 @@ eval (Env env) (EVar v)    =
   case M.lookup v env of
     Nothing -> error $ "Could not find " <> show v <> " in env " <> show env
     Just v' -> (v', [])
-eval env (ELam vs e)     = (VLam env (map fst vs) e, [])
+eval env (ELam vs _ e)     = (VLam env (map fst vs) e, [])
 eval env (EApp e es)       =
   case eval env e of
     (lam@(VLam venv vs body), sources) ->

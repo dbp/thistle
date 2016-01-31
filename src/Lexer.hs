@@ -3,7 +3,7 @@ module Lexer where
 
 import           Data.Char
 import           Data.Monoid
-import           Data.Text   (Text, pack)
+import           Data.Text   (Text, pack, unpack)
 
 data Token
       = TokenInt Int
@@ -24,6 +24,8 @@ data Token
       | TokenBC
       | TokenArrow
       | TokenTInt
+      | TokenTDouble
+      | TokenTBool
       | TokenTString
       | TokenIf
       | TokenElse
@@ -40,6 +42,41 @@ data Token
       | TokenDivide
  deriving Show
 
+renderToken :: Token -> String
+renderToken (TokenInt n) = show n
+renderToken (TokenDouble d) = show d
+renderToken TokenTrue = "true"
+renderToken TokenFalse = "false"
+renderToken (TokenString s) = "\"" <> unpack s <> "\""
+renderToken (TokenVar v) = unpack v
+renderToken TokenDot = "."
+renderToken TokenColon = ":"
+renderToken TokenSemiColon = ";"
+renderToken TokenComma = ","
+renderToken TokenPO = "("
+renderToken TokenPC = ")"
+renderToken TokenSBO = "["
+renderToken TokenSBC = "]"
+renderToken TokenBO = "{"
+renderToken TokenBC = "}"
+renderToken TokenArrow = "->"
+renderToken TokenTInt = "int"
+renderToken TokenTDouble = "double"
+renderToken TokenTBool = "bool"
+renderToken TokenTString = "string"
+renderToken TokenIf = "if"
+renderToken TokenElse = "else"
+renderToken TokenCase = "case"
+renderToken TokenEqual = "="
+renderToken TokenEquals = "=="
+renderToken TokenIn = "in"
+renderToken TokenSource = "source"
+renderToken TokenAO = "<"
+renderToken TokenAC = ">"
+renderToken TokenPlus = "+"
+renderToken TokenTimes = "*"
+renderToken TokenMinus = "-"
+renderToken TokenDivide = "/"
 
 lexer :: String -> [Token]
 lexer [] = []
@@ -80,6 +117,8 @@ lexVar cs =
       ("in",rest) -> TokenIn : lexer rest
       ("source",rest) -> TokenSource : lexer rest
       ("int",rest) -> TokenTInt : lexer rest
+      ("double",rest) -> TokenTDouble : lexer rest
+      ("bool",rest) -> TokenTBool : lexer rest
       ("string",rest) -> TokenTString : lexer rest
       (var,rest)   -> TokenVar (pack var) : lexer rest
 

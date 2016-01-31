@@ -38,7 +38,7 @@ handle :: Ctxt -> Text -> IO (Maybe Response)
 handle ctxt pth =
   do progtext <- T.readFile "program.thst"
      let prog = parse (lexer (T.unpack (progtext <> " in {}")))
-     let !t = tc emptyTEnv prog
+     let !t = tc False emptyTEnv prog
      let file = "templates/" <>  pth <> ".tpl"
      e <- doesFileExist (T.unpack file)
      if not e
@@ -56,19 +56,37 @@ handle ctxt pth =
            Right _ -> error "renderFile: parseHTML returned XML."
 
 evalTemplate :: Text -> [X.Node] -> IO [X.Node]
-evalTemplate progtext nodes = mapM evalNode nodes
+evalTemplate progtext nodes = concat <$> mapM evalNode nodes
   where evalNode n@(X.Element t atrs cs) |
                    t == "show" &&
                    X.hasAttribute "e" n =
           catch (let Just src = X.getAttribute "e" n
                      prog' = progtext <> " in " <> src
                      prog = parse (lexer (T.unpack prog'))
-                     !t = tc emptyTEnv prog
+                     !t = tc False emptyTEnv prog
                      (v,_) = eval emptyEnv prog
-                 in return $ X.TextNode (renderV v))
+                 in return $ [X.TextNode (renderV v)])
                 (\(e ::SomeException) ->
-                   return $ X.TextNode (T.pack (show e)))
+                   return $ [X.TextNode (T.pack (show e))])
+        evalNode n@(X.Element t atrs cs) |
+                   t == "each" &&
+                   X.hasAttribute "e" n  &&
+                   X.hasAttribute "v" n =
+         catch (let Just src = X.getAttribute "e" n
+                    Just var = X.getAttribute "v" n
+                    prog' = progtext <> " in " <> src
+                    prog = parse (lexer (T.unpack prog'))
+                    TList t = tc False emptyTEnv prog
+                    (v,_) = eval emptyEnv prog
+                in case v of
+                     VList vs ->
+                       concat <$> mapM (\n -> let iterprog = "_each = " <> prog' <> " nth = (l : " <> renderT (TList t) <> ", n : int) : " <> renderT t <> " { case l { nth(l, n) } (h t) { if n == 0 { h } else { nth(t, n - 1) } } } " <> var <> " = nth(_each, " <> T.pack (show n) <> ")"
+                                              in do print iterprog
+                                                    evalTemplate iterprog cs) (take (length vs) [0..])
+                     v -> return $ [X.TextNode $ "<each>: got non-list: " <> renderV v])
+               (\(e ::SomeException) ->
+                  return $ [X.TextNode (T.pack (show e))])
         evalNode (X.Element t atrs cs) =
-          do cs' <- mapM evalNode cs
-             return $ X.Element t atrs cs'
-        evalNode n = return n
+          do cs' <- concat <$> mapM evalNode cs
+             return $ [X.Element t atrs cs']
+        evalNode n = return [n]
