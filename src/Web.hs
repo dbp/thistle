@@ -50,24 +50,32 @@ handle ctxt pth =
          case X.parseHTML (T.unpack f) (T.encodeUtf8 contents) of
            Left err -> errText (T.pack err)
            Right (X.HtmlDocument enc typ doc) ->
-             do x <- evalTemplate progtext doc
+             do x <- evalTemplateWithProg progtext doc
                 let b = X.render (X.HtmlDocument enc typ x)
                 okHtml $ T.decodeUtf8 $ Blaze.toByteString b
            Right _ -> error "renderFile: parseHTML returned XML."
 
-evalTemplate :: Text -> [X.Node] -> IO [X.Node]
-evalTemplate progtext' ns = concat <$> mapM evalNode ns
-  where progtext = if T.null progtext'
-                      then ""
-                      else progtext' <> " in "
-        evalNode n@(X.Element t atrs cs) |
+evalTemplateWithProg :: Text -> [X.Node] -> IO [X.Node]
+evalTemplateWithProg progtext ns =
+    let (env, tenv) =
+          if T.null progtext
+             then (emptyEnv, emptyTEnv)
+             else let prog = parse $ lexer $ T.unpack $ progtext <> " in () : {} { {} }"
+                      (TLam _ _, tenv') = tc False emptyTEnv prog
+                      (VLam env' _ _, _) = eval emptyEnv prog
+                   in (env', tenv')
+     in evalTemplate env tenv ns
+
+
+evalTemplate :: Env -> TEnv -> [X.Node] -> IO [X.Node]
+evalTemplate env tenv ns = concat <$> mapM evalNode ns
+  where evalNode n@(X.Element t atrs cs) |
                    t == "show" &&
                    X.hasAttribute "e" n =
           catch (let Just src = X.getAttribute "e" n
-                     prog' = progtext <> src
-                     prog = parse (lexer (T.unpack prog'))
-                     !t = tc False emptyTEnv prog
-                     (v,_) = eval emptyEnv prog
+                     prog = parse (lexer (T.unpack src))
+                     !t = tc False tenv prog
+                     (v,_) = eval env prog
                  in return $ [X.TextNode (renderV v)])
                 (\(e ::SomeException) ->
                    return $ [X.TextNode (T.pack (show e))])
@@ -77,14 +85,16 @@ evalTemplate progtext' ns = concat <$> mapM evalNode ns
                    X.hasAttribute "v" n =
          catch (let Just src = X.getAttribute "e" n
                     Just var = X.getAttribute "v" n
-                    prog' = progtext <> src
-                    prog = parse (lexer (T.unpack prog'))
-                    TList t = tc False emptyTEnv prog
-                    (v,_) = eval emptyEnv prog
+                    prog = parse (lexer (T.unpack src))
+                    (TList t, _) = tc False tenv prog
+                    (v,_) = eval env prog
                 in case v of
                      VList vs ->
-                       concat <$> mapM (\n -> let iterprog = "_each = " <> prog' <> " nth = (l : " <> renderT (TList t) <> ", n : int) : " <> renderT t <> " { case l { nth(l, n) } (h t) { if n == 0 { h } else { nth(t, n - 1) } } } " <> var <> " = nth(_each, " <> T.pack (show n) <> ")"
-                                              in evalTemplate iterprog cs) (take (length vs) [0..])
+                       concat <$> mapM (\v ->
+                               evalTemplate (extendEnv env [(Var var, v)])
+                                            (extendTEnv tenv [(Var var, t)])
+                                            cs)
+                            vs
                      v -> return $ [X.TextNode $ "<each>: got non-list: " <> renderV v])
                (\(e ::SomeException) ->
                   return $ [X.TextNode (T.pack (show e))])

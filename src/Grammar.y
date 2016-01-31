@@ -103,6 +103,11 @@ Type : tint { TInt }
      | '[' Type ']' { TList $2 }
      | '->' Type { TLam [] $2 }
      | ArrowArgs '->' Type { TLam $1 $3 }
+     | '{' '}' { TObject M.empty }
+     | '{' TObjectFields '}' { TObject (M.fromList $2) }
+
+TObjectFields : var ':' Type ',' TObjectFields { ($1, $3):$5 }
+              | var ':' Type { [($1, $3)] }
 
 ArrowArgs : Type ',' ArrowArgs { $1:$3 }
           | Type { [$1] }

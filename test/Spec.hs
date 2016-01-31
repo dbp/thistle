@@ -158,25 +158,25 @@ main = hspec $ do
                                    ,ESource (ES (Id "1") TInt) (EInt 10)])
              `shouldBe` (VInt 11, [VSBase (Id "1") [] (VInt 10)])
   describe "tc" $ do
+    let shouldTypeAs e t = fst (tc False emptyTEnv e) `shouldBe` t
     describe "constants" $ do
-      it "ints" $ tc False emptyTEnv (EInt 1) `shouldBe` TInt
-      it "strings" $ tc False emptyTEnv (EString "hello") `shouldBe` TString
-      it "bools" $ tc False emptyTEnv (EBool True) `shouldBe` TBool
-      it "doubles" $ tc False emptyTEnv (EDouble 1) `shouldBe` TDouble
+      it "ints" $ EInt 1 `shouldTypeAs` TInt
+      it "strings" $ EString "hello" `shouldTypeAs` TString
+      it "bools" $ EBool True `shouldTypeAs` TBool
+      it "doubles" $ EDouble 1 `shouldTypeAs` TDouble
       it "lists" $
-        tc False emptyTEnv (EList TInt [EInt 1, EInt 2])
-           `shouldBe` TList TInt
+        EList TInt [EInt 1, EInt 2]
+           `shouldTypeAs` TList TInt
       it "lists should not be hererogeneous" $
          evaluate (tc False emptyTEnv (EList TInt [EInt 1, EDouble 2]))
                   `shouldThrow` anyErrorCall
       it "objects" $
-        tc False emptyTEnv (EObject (M.fromList [("k", EInt 2),("l", EInt 3)]))
-           `shouldBe` TObject (M.fromList [("k", TInt),("l", TInt)])
+        EObject (M.fromList [("k", EInt 2),("l", EInt 3)])
+           `shouldTypeAs` TObject (M.fromList [("k", TInt),("l", TInt)])
     describe "prims" $ do
       describe "+ on ints" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PPlus [EInt 1, EInt 10])
-             `shouldBe` TInt
+          EPrim PPlus [EInt 1, EInt 10] `shouldTypeAs` TInt
         it "doesn't work on more than two arguments" $
           evaluate (tc False emptyTEnv (EPrim PPlus [EInt 1, EInt 1, EInt 2]))
                    `shouldThrow` anyErrorCall
@@ -194,22 +194,19 @@ main = hspec $ do
                    `shouldThrow` anyErrorCall
       describe "+ on doubles" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PPlus [EDouble 1, EDouble 10])
-             `shouldBe` TDouble
+          EPrim PPlus [EDouble 1, EDouble 10] `shouldTypeAs` TDouble
         it "doesn't work on bools and doubles" $
           evaluate (tc False emptyTEnv (EPrim PPlus [EBool True, EDouble 10]))
                    `shouldThrow` anyErrorCall
       describe "+ on strings" $ do
         it "works" $
-             tc False emptyTEnv (EPrim PPlus [EString "a", EString "b"])
-                `shouldBe` TString
+             EPrim PPlus [EString "a", EString "b"] `shouldTypeAs` TString
         it "doesn't work on strings and ints" $
           evaluate (tc False emptyTEnv (EPrim PPlus [EString "a", EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "- on ints" $ do
         it "works" $
-           tc False emptyTEnv (EPrim PMinus [EInt 1, EInt 10])
-              `shouldBe` TInt
+           EPrim PMinus [EInt 1, EInt 10] `shouldTypeAs` TInt
         it "doesn't work on bools and ints" $
           evaluate (tc False emptyTEnv (EPrim PMinus [EBool True, EInt 10]))
                    `shouldThrow` anyErrorCall
@@ -221,71 +218,63 @@ main = hspec $ do
                     `shouldThrow` anyErrorCall
       describe "- on doubles" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PMinus [EDouble 1, EDouble 10])
-             `shouldBe` TDouble
+          EPrim PMinus [EDouble 1, EDouble 10] `shouldTypeAs` TDouble
         it "doesn't work on doubles and ints" $
           evaluate (tc False emptyTEnv (EPrim PMinus [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "* on ints" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PTimes [EInt 1, EInt 10])
-             `shouldBe` TInt
+          EPrim PTimes [EInt 1, EInt 10] `shouldTypeAs` TInt
         it "doesn't work on doubles and ints" $
           evaluate (tc False emptyTEnv (EPrim PTimes [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "* on doubles" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PTimes [EDouble 1, EDouble 10])
-             `shouldBe` TDouble
+          EPrim PTimes [EDouble 1, EDouble 10] `shouldTypeAs` TDouble
         it "doesn't work on doubles and ints" $
           evaluate (tc False emptyTEnv (EPrim PTimes [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "/ on ints" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PDivide [EInt 1, EInt 10])
-             `shouldBe` TInt
+          EPrim PDivide [EInt 1, EInt 10]
+             `shouldTypeAs` TInt
         it "doesn't work on doubles and ints" $
           evaluate (tc False emptyTEnv (EPrim PDivide [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "/ on doubles" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PDivide [EDouble 1, EDouble 10])
-             `shouldBe` TDouble
+          EPrim PDivide [EDouble 1, EDouble 10] `shouldTypeAs` TDouble
         it "doesn't work on doubles and ints" $
           evaluate (tc False emptyTEnv (EPrim PDivide [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "== on ints" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PEquals [EInt 1, EInt 10])
-             `shouldBe` TBool
+          EPrim PEquals [EInt 1, EInt 10] `shouldTypeAs` TBool
         it "doesn't work on doubles and ints" $
           evaluate (tc False emptyTEnv (EPrim PEquals [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "== on doubles" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PEquals [EDouble 1, EDouble 10])
-             `shouldBe` TBool
+          EPrim PEquals [EDouble 1, EDouble 10] `shouldTypeAs` TBool
         it "doesn't work on doubles and ints" $
           evaluate (tc False emptyTEnv (EPrim PEquals [EDouble 1, EInt 10]))
                    `shouldThrow` anyErrorCall
       describe "== on strings" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PEquals [EString "", EString "bla"])
-             `shouldBe` TBool
+          EPrim PEquals [EString "", EString "bla"] `shouldTypeAs` TBool
         it "doesn't work on strings and ints" $
           evaluate (tc False emptyTEnv (EPrim PEquals [EString "1", EInt 1]))
                    `shouldThrow` anyErrorCall
       describe "== on lists" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PEquals [EList TInt [], EList TInt []])
-             `shouldBe` TBool
+          EPrim PEquals [EList TInt [], EList TInt []] `shouldTypeAs` TBool
         it "doesn't work on lists of different types" $
           evaluate (tc False emptyTEnv (EPrim PEquals [EList TInt [], EList TString []]))
                    `shouldThrow` anyErrorCall
       describe "== on objects" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PEquals [EObject $ M.fromList [("x", EInt 1)], EObject $ M.fromList [("x", EInt 2)]])
-             `shouldBe` TBool
+          EPrim PEquals [EObject $ M.fromList [("x", EInt 1)], EObject $ M.fromList [("x", EInt 2)]]
+             `shouldTypeAs` TBool
         it "doesn't work on fields of different types" $
           evaluate (tc False emptyTEnv (EPrim PEquals [EObject $ M.fromList [("x", EInt 1)], EObject $ M.fromList [("x", EDouble 2)]]))
                    `shouldThrow` anyErrorCall
@@ -298,39 +287,38 @@ main = hspec $ do
                    `shouldThrow` anyErrorCall
       describe "== on bools" $ do
         it "works" $
-          tc False emptyTEnv (EPrim PEquals [EBool True, EBool False])
-             `shouldBe` TBool
+          EPrim PEquals [EBool True, EBool False] `shouldTypeAs` TBool
         it "doesn't work on bools and ints" $
           evaluate (tc False emptyTEnv (EPrim PEquals [EBool True, EInt 1]))
                    `shouldThrow` anyErrorCall
     describe "vars, let, lam, and application" $ do
       it "(x:int) : int { x } typechecks" $
-        tc False emptyTEnv (ELam [(Var "x", TInt)] TInt (EVar (Var "x")))
-           `shouldBe` TLam [TInt] TInt
+        ELam [(Var "x", TInt)] TInt (EVar (Var "x"))
+             `shouldTypeAs` TLam [TInt] TInt
       it "(x:int) : int { x x } fails" $
         evaluate (tc False emptyTEnv (ELam [(Var "x", TInt)] TInt (EApp (EVar (Var "x"))  [(EVar (Var "x"))])))
                  `shouldThrow` anyErrorCall
       it "(x:int) : int{ 10 } typechecks" $
-        tc False emptyTEnv (ELam [(Var "x", TInt)] TInt (EInt 10))
-           `shouldBe` TLam [TInt] TInt
+        ELam [(Var "x", TInt)] TInt (EInt 10)
+           `shouldTypeAs` TLam [TInt] TInt
       it "(f : int -> int) : int { f 10 } typechecks" $
-        tc False emptyTEnv (ELam [(Var "f", TLam [TInt] TInt)] TInt (EApp (EVar (Var "f")) [EInt 10]))
-           `shouldBe` TLam [TLam [TInt] TInt] TInt
+        ELam [(Var "f", TLam [TInt] TInt)] TInt (EApp (EVar (Var "f")) [EInt 10])
+           `shouldTypeAs` TLam [TLam [TInt] TInt] TInt
       it "(x:int y:bool) : bool { y } typechecks" $
-        tc False emptyTEnv (ELam [(Var "x", TInt),(Var "y", TBool)] TBool
-                           (EVar (Var "y")))
-           `shouldBe` TLam [TInt, TBool] TBool
+        ELam [(Var "x", TInt),(Var "y", TBool)] TBool
+                           (EVar (Var "y"))
+           `shouldTypeAs` TLam [TInt, TBool] TBool
       it "(f : int -> bool) : bool { f true } fails" $
         evaluate (tc False emptyTEnv (ELam [(Var "f", TLam [TInt] TBool)] TBool (EApp (EVar (Var "f")) [EBool True])))
                    `shouldThrow` anyErrorCall
       it "x = 2 in x" $
-        tc False emptyTEnv (ELet (Var "x") (EInt 2) (EVar (Var "x")))
-           `shouldBe` TInt
+        ELet (Var "x") (EInt 2) (EVar (Var "x"))
+           `shouldTypeAs` TInt
       it "x = 2 in x = true in x" $
-        tc False emptyTEnv (ELet (Var "x") (EInt 2) (ELet (Var "x") (EBool True) (EVar (Var "x"))))
-           `shouldBe` TBool
+        ELet (Var "x") (EInt 2) (ELet (Var "x") (EBool True) (EVar (Var "x")))
+           `shouldTypeAs` TBool
       it "recursive functions type check" $
-        tc False emptyTEnv (ELet (Var "f") (ELam [(Var "x", TList TInt)] TInt
+        ELet (Var "f") (ELam [(Var "x", TList TInt)] TInt
                                     (ECase (EVar (Var "x"))
                                            (EInt 0)
                                            (Var "_")
@@ -340,12 +328,11 @@ main = hspec $ do
                                               [EInt 1,
                                                EApp (EVar (Var "f"))
                                                     [EVar (Var "rest")]])))
-                    (EApp (EVar (Var "f")) [EList TInt [EInt 0, EInt 0, EInt 0]]))
-          `shouldBe` TInt
+                    (EApp (EVar (Var "f")) [EList TInt [EInt 0, EInt 0, EInt 0]])
+          `shouldTypeAs` TInt
     describe "if, dot, and case" $ do
       it "if true 1 2 typechecks" $
-        tc False emptyTEnv (EIf (EBool True) (EInt 1) (EInt 2))
-           `shouldBe` TInt
+        EIf (EBool True) (EInt 1) (EInt 2) `shouldTypeAs` TInt
       it "if false 1 true fails" $
         evaluate (tc False emptyTEnv (EIf (EBool False) (EInt 1) (EBool True)))
                  `shouldThrow` anyErrorCall
@@ -353,17 +340,17 @@ main = hspec $ do
         evaluate (tc False emptyTEnv (EIf (EInt 1) (EInt 1) (EInt 1)))
                  `shouldThrow` anyErrorCall
       it "if true (x : int) { 10 } (y : int) { 20 } typechecks" $
-        tc False emptyTEnv (EIf (EBool True) (ELam [(Var "x", TInt)] TInt (EInt 10)) (ELam [(Var "y", TInt)] TInt (EInt 20)))
-           `shouldBe` TLam [TInt] TInt
+        EIf (EBool True) (ELam [(Var "x", TInt)] TInt (EInt 10)) (ELam [(Var "y", TInt)] TInt (EInt 20))
+           `shouldTypeAs` TLam [TInt] TInt
       it "{x: 1}.x typechecks" $
-         tc False emptyTEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "x")
-            `shouldBe` TInt
+         EDot (EObject (M.fromList [("x", EInt 1)])) "x"
+            `shouldTypeAs` TInt
       it "{x: 1}.y fails" $
          evaluate (tc False emptyTEnv (EDot (EObject (M.fromList [("x", EInt 1)])) "y"))
                   `shouldThrow` anyErrorCall
       it "case [:int] { 1 } (_ _) { 2 } typechecks" $
-        tc False emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "_") (EInt 2))
-           `shouldBe` TInt
+        ECase (EList TInt []) (EInt 1) (Var "_") (Var "_") (EInt 2)
+           `shouldTypeAs` TInt
       it "case [:int] { true } (_ _) { 2 } fails" $
         evaluate (tc False emptyTEnv (ECase (EList TInt []) (EBool True) (Var "_") (Var "_") (EInt 2)))
                  `shouldThrow` anyErrorCall
@@ -371,18 +358,18 @@ main = hspec $ do
         evaluate (tc False emptyTEnv (ECase (EList TInt []) (EBool True) (Var "h") (Var "_") (EVar (Var "h"))))
                  `shouldThrow` anyErrorCall
       it "case [:int] { 1 } (h _) { h } typechecks" $
-        tc False emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "h") (Var "_") (EVar (Var "h")))
-                                                                                       `shouldBe` TInt
+        ECase (EList TInt []) (EInt 1) (Var "h") (Var "_") (EVar (Var "h"))
+          `shouldTypeAs` TInt
       it "case [:int] { 1 } (_ t) { t } fails" $
         evaluate (tc False emptyTEnv (ECase (EList TInt []) (EInt 1) (Var "_") (Var "t") (EVar (Var "t"))))
                  `shouldThrow` anyErrorCall
     describe "sources" $ do
       it "source<foo;int;1> typechecks" $
-        tc False emptyTEnv (ESource (ES (Id "foo") TInt) (EInt 1))
-           `shouldBe` TInt
+        ESource (ES (Id "foo") TInt) (EInt 1)
+           `shouldTypeAs` TInt
       it "source<foo;[int];[1,2,3 : int]> typechecks" $
-        tc False emptyTEnv (ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3]))
-           `shouldBe` TList TInt
+        ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3])
+           `shouldTypeAs` TList TInt
       it "source<foo;int;\"too\"> fails" $
         evaluate (tc False emptyTEnv (ESource (ES (Id "foo") TInt) (EString "too")))
                  `shouldThrow` anyErrorCall
@@ -462,8 +449,9 @@ main = hspec $ do
                   X.parseHTML "" (T.encodeUtf8 tags)
                 Right (X.HtmlDocument _ _ out') =
                   X.parseHTML "" (T.encodeUtf8 out)
-            in collapseText <$> evalTemplate prog nodes `shouldReturn` out'
+            in collapseText <$> evalTemplateWithProg prog  nodes `shouldReturn` out'
     shouldRenderWith "<show e='1'/>" "" "1"
     shouldRenderWith "<show e='x'/>" "x = 10" "10"
     shouldRenderWith "<show e='f(10) + 1'/>" "f = (x:int):int { x + 1 }" "12"
     shouldRenderWith "<each e='[1,2,3:int]' v='x'><show e='x'/></each>" "" "123"
+    shouldRenderWith "<each e='[[1,2:int],[3,4:int]:[int]]' v='x'><each e='x' v='y'><show e='y'/></each></each>" "" "1234"
