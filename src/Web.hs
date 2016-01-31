@@ -56,12 +56,15 @@ handle ctxt pth =
            Right _ -> error "renderFile: parseHTML returned XML."
 
 evalTemplate :: Text -> [X.Node] -> IO [X.Node]
-evalTemplate progtext nodes = concat <$> mapM evalNode nodes
-  where evalNode n@(X.Element t atrs cs) |
+evalTemplate progtext' ns = concat <$> mapM evalNode ns
+  where progtext = if T.null progtext'
+                      then ""
+                      else progtext' <> " in "
+        evalNode n@(X.Element t atrs cs) |
                    t == "show" &&
                    X.hasAttribute "e" n =
           catch (let Just src = X.getAttribute "e" n
-                     prog' = progtext <> " in " <> src
+                     prog' = progtext <> src
                      prog = parse (lexer (T.unpack prog'))
                      !t = tc False emptyTEnv prog
                      (v,_) = eval emptyEnv prog
@@ -74,15 +77,14 @@ evalTemplate progtext nodes = concat <$> mapM evalNode nodes
                    X.hasAttribute "v" n =
          catch (let Just src = X.getAttribute "e" n
                     Just var = X.getAttribute "v" n
-                    prog' = progtext <> " in " <> src
+                    prog' = progtext <> src
                     prog = parse (lexer (T.unpack prog'))
                     TList t = tc False emptyTEnv prog
                     (v,_) = eval emptyEnv prog
                 in case v of
                      VList vs ->
                        concat <$> mapM (\n -> let iterprog = "_each = " <> prog' <> " nth = (l : " <> renderT (TList t) <> ", n : int) : " <> renderT t <> " { case l { nth(l, n) } (h t) { if n == 0 { h } else { nth(t, n - 1) } } } " <> var <> " = nth(_each, " <> T.pack (show n) <> ")"
-                                              in do print iterprog
-                                                    evalTemplate iterprog cs) (take (length vs) [0..])
+                                              in evalTemplate iterprog cs) (take (length vs) [0..])
                      v -> return $ [X.TextNode $ "<each>: got non-list: " <> renderV v])
                (\(e ::SomeException) ->
                   return $ [X.TextNode (T.pack (show e))])

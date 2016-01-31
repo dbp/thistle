@@ -1,13 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import           Control.Exception (evaluate)
-import qualified Data.Map          as M
-import qualified Data.Text         as T
+import           Control.Exception  (evaluate)
+import           Data.List          (groupBy)
+import qualified Data.Map           as M
+import qualified Data.Text          as T
+import qualified Data.Text.Encoding as T
 import           Test.Hspec
+import qualified Text.XmlHtml       as X
 
 import qualified Grammar
 import           Lang
 import           Lexer
+import           Web
 
 main :: IO ()
 main = hspec $ do
@@ -448,11 +452,18 @@ main = hspec $ do
     "1 + 1 * 2 == 2 - 1" `shouldParse` (EPrim PEquals [EPrim PPlus [EInt 1, EPrim PTimes [EInt 1, EInt 2]], EPrim PMinus [EInt 2, EInt 1]])
     "source<foo;[int];[1,2,3 : int]>" `shouldParse` (ESource (ES (Id "foo") (TList TInt)) (EList TInt [EInt 1, EInt 2, EInt 3]))
     "x = 10 y = 20 in y" `shouldParse` (ELet (Var "x") (EInt 10) (ELet (Var "y") (EInt 20) (EVar (Var "y"))))
-  -- describe "parsing typ" $ do
-  --   let shouldParse s v = it (T.unpack s) $ parseT s `shouldBe` Right v
-  --   "int" `shouldParse` TInt
-  --   "string" `shouldParse` TString
-  --   "[int]" `shouldParse` TList TInt
-  --   "int -> int" `shouldParse` TLam [TInt] TInt
-  --   "-> int" `shouldParse` TLam [] TInt
-  --   "int, string -> int" `shouldParse` TLam [TInt, TString] TInt
+  describe "evalTemplate" $ do
+    let collapse' (X.Element t as cs) = X.Element t as (collapseText cs)
+        collapse' n = n
+        collapseText xs = map (\e -> if length e == 1 then collapse' (head e) else X.TextNode (T.concat (map X.nodeText e))) $ groupBy (\e1 e2 -> X.isTextNode e1 && X.isTextNode e2) xs
+        shouldRenderWith tags prog out =
+          it (T.unpack tags) $
+            let Right (X.HtmlDocument _ _ nodes) =
+                  X.parseHTML "" (T.encodeUtf8 tags)
+                Right (X.HtmlDocument _ _ out') =
+                  X.parseHTML "" (T.encodeUtf8 out)
+            in collapseText <$> evalTemplate prog nodes `shouldReturn` out'
+    shouldRenderWith "<show e='1'/>" "" "1"
+    shouldRenderWith "<show e='x'/>" "x = 10" "10"
+    shouldRenderWith "<show e='f(10) + 1'/>" "f = (x:int):int { x + 1 }" "12"
+    shouldRenderWith "<each e='[1,2,3:int]' v='x'><show e='x'/></each>" "" "123"
