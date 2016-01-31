@@ -456,3 +456,4 @@ main = hspec $ do
     shouldRenderWith "<each e='[1,2,3:int]' v='x'><show e='x'/></each>" "" "123"
     shouldRenderWith "<each e='[[1,2:int],[3,4:int]:[int]]' v='x'><each e='x' v='y'><show e='y'/></each></each>" "" "1234"
     shouldRenderWith "<let e='\"hello\"' v='msg'/><show e='msg'/>" "" "hello"
+    shouldRenderWith "<let e='obj.l' v='l'/><each e='l' v='elem'><show e='elem'/></each>" "obj = {l: [1,2,3:int]}" "123"
