@@ -5,28 +5,30 @@
 
 module Web where
 
-
-import qualified Blaze.ByteString.Builder as Blaze
-import           Control.Exception        (SomeException, catch)
+import qualified Blaze.ByteString.Builder  as Blaze
+import           Control.Exception         (SomeException, catch)
 import           Control.Lens
-import           Control.Monad            (foldM, void)
-import qualified Data.Aeson               as A
-import           Data.Binary              (decode, encode)
-import qualified Data.ByteString.Lazy     as BL
-import qualified Data.HashMap.Strict      as HM (toList)
-import qualified Data.Map                 as M
+import           Control.Monad             (foldM, void)
+import qualified Data.Aeson                as A
+import           Data.Binary               (decode, encode)
+import qualified Data.ByteString.Lazy      as BL
+import qualified Data.HashMap.Strict       as HM (toList)
+import           Data.List                 (find)
+import qualified Data.Map                  as M
 import           Data.Monoid
-import           Data.Scientific          (floatingOrInteger)
-import           Data.Text                (Text)
-import qualified Data.Text                as T
-import qualified Data.Text.Encoding       as T
-import qualified Data.Text.IO             as T
-import qualified Data.Vector              as V (toList)
-import qualified Database.Redis           as R
-import           Network.Wai              (Response)
-import           System.Directory         (doesFileExist)
-import qualified Text.XmlHtml             as X
+import           Data.Scientific           (floatingOrInteger)
+import           Data.Text                 (Text)
+import qualified Data.Text                 as T
+import qualified Data.Text.Encoding        as T
+import qualified Data.Text.IO              as T
+import qualified Data.Vector               as V (toList)
+import qualified Database.Redis            as R
+import           Network.HTTP.Types.Header (hReferer)
+import           Network.Wai               (Response, requestHeaders)
+import           System.Directory          (doesFileExist)
+import qualified Text.XmlHtml              as X
 import           Web.Fn
+
 
 import           Data.Aeson.Helpers
 
@@ -72,7 +74,9 @@ instance FromParam T where
 
 handleAPI :: Ctxt -> Text -> V -> T -> IO (Maybe Response)
 handleAPI ctxt i v t = do redisSetSource (_redis ctxt) (Id i) (v,t)
-                          okText "ok"
+                          case find ((== hReferer) . fst) $ requestHeaders (fst $ _req ctxt) of
+                            Just (_,r) -> redirect (T.decodeUtf8 r)
+                            Nothing -> okText "ok"
 
 handleTemplate :: Ctxt -> Text -> IO (Maybe Response)
 handleTemplate ctxt pth =
@@ -123,14 +127,20 @@ evalTemplateWithProg gs progtext ns =
 evalTemplate :: (Id -> IO (Maybe (V, T))) -> Env -> TEnv -> [X.Node] -> IO [X.Node]
 evalTemplate gs env tenv ns = (\(_,_,x) -> x) <$>
                            (foldM evalNode (env, tenv, []) ns)
-  where evalNode (env,tenv,ns) n@(X.Element t atrs cs) |
+  where renderSource (VSBase (Id t) ty _ v) = X.Element "form" [("action", "/api")]
+                                           [X.Element "textarea" [("name", "value")] [X.TextNode (vToJson v)]
+                                           ,X.Element "input" [("type", "hidden"), ("name", "source"), ("value", t)] []
+                                           ,X.Element "input" [("type", "hidden"), ("name", "type"), ("value", renderT ty)] []
+                                           ,X.Element "button" [("type", "submit")] [X.TextNode "Submit"]]
+        evalNode (env,tenv,ns) n@(X.Element t atrs cs) |
                    t == "show" &&
                    X.hasAttribute "e" n =
           catch (do let Just src = X.getAttribute "e" n
                         prog = parse (lexer (T.unpack src))
                         !t = tc False tenv prog
-                    (v,_) <- eval gs env prog
-                    return (env, tenv, ns ++ [X.TextNode (renderV v)]))
+                    (v,sources) <- eval gs env prog
+                    return (env, tenv, ns ++ [X.TextNode (renderV v)
+                                             ,X.Element "div" [("class", "sources")] (map renderSource sources)]))
                 (\(e ::SomeException) ->
                    return (env, tenv, ns ++ [X.TextNode (T.pack (show e))]))
         evalNode (env,tenv,ns) n@(X.Element t atrs cs) |
@@ -141,13 +151,13 @@ evalTemplate gs env tenv ns = (\(_,_,x) -> x) <$>
                        Just var = X.getAttribute "v" n
                        prog = parse (lexer (T.unpack src))
                        (TList t, _) = tc False tenv prog
-                   (v,_) <- eval gs env prog
+                   (v,ss) <- eval gs env prog
                    case v of
                      VList vs ->
                        foldM (\(env, tenv, ns) v ->
                           do ns' <- evalTemplate
                                       gs
-                                      (extendEnv env [(var, v)])
+                                      (extendEnv env [(var, (v, ss))])
                                       (extendTEnv tenv [(var, t)])
                                       cs
                              return (env, tenv, ns ++ ns'))
@@ -164,7 +174,7 @@ evalTemplate gs env tenv ns = (\(_,_,x) -> x) <$>
                            Just var = X.getAttribute "v" n
                            prog = parse (lexer (T.unpack src))
                            !(t,_) = tc False tenv prog
-                       (v,_) <- eval gs env prog
+                       v <- eval gs env prog
                        return (extendEnv env [(var, v)], extendTEnv tenv [( var, t)], ns))
                    (\(e ::SomeException) ->
                       return (env, tenv, ns ++ [X.TextNode (T.pack (show e))]))

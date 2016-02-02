@@ -78,17 +78,17 @@ data ES = ES Id T deriving (Show, Eq, Generic)
 
 instance Binary ES
 
-data Env = Env (M.Map Text V) deriving (Show, Eq, Generic)
+data Env = Env (M.Map Text (V, [VS])) deriving (Show, Eq, Generic)
 
 instance Binary Env
 
 emptyEnv :: Env
 emptyEnv = Env M.empty
 
-envFromList :: [(Text, V)] -> Env
+envFromList :: [(Text, (V, [VS]))] -> Env
 envFromList ls = Env (M.fromList ls)
 
-extendEnv :: Env -> [(Text, V)] -> Env
+extendEnv :: Env -> [(Text, (V, [VS]))] -> Env
 extendEnv (Env e) vs = Env (M.union (M.fromList vs) e)
 
 data TEnv = TEnv (M.Map Text T) deriving (Show, Eq)
@@ -110,6 +110,17 @@ data V = VInt Int
 
 instance Binary V
 
+vToJson :: V -> Text
+vToJson (VInt n) = T.pack (show n)
+vToJson (VDouble n) = T.pack (show n)
+vToJson (VBool True) = "true"
+vToJson (VBool False) = "false"
+vToJson (VString s) = T.pack (show s)
+vToJson (VList vs) = "[" <> T.intercalate ", " (map vToJson vs) <> "]"
+vToJson (VObject m) = "{" <> T.intercalate ", " (map (\(k,v) -> k <> ": " <> vToJson v) $ M.assocs m) <> "}"
+vToJson (VLam _ as _) = "(" <> T.intercalate ", " (map (\v -> v) as) <> ") { .. }"
+
+
 renderV :: V -> Text
 renderV (VInt n) = T.pack (show n)
 renderV (VDouble n) = T.pack (show n)
@@ -120,19 +131,20 @@ renderV (VList vs) = "[" <> T.intercalate ", " (map renderV vs) <> "]"
 renderV (VObject m) = "{" <> T.intercalate ", " (map (\(k,v) -> k <> ": " <> renderV v) $ M.assocs m) <> "}"
 renderV (VLam _ as _) = "(" <> T.intercalate ", " (map (\v -> v) as) <> ") { .. }"
 
-data VS = VSBase Id [UserId] V
-        | VSList Id [UserId] [VS]
+data VS = VSBase Id T [UserId] V
+        | VSList Id T [UserId] [VS]
         | VSObject Id [UserId] (M.Map Text VS)
-        deriving (Show, Eq)
+        deriving (Show, Eq, Generic)
+
+instance Binary VS
 
 data Id = Id Text deriving (Show, Eq, Generic)
 
 instance Binary Id
 
-data UserId = UserId Int deriving (Show, Eq)
+data UserId = UserId Int deriving (Show, Eq, Generic)
 
-type SourceResolver = VS -> IO (Maybe V)
-
+instance Binary UserId
 
 tc :: Bool -> TEnv -> E -> (T, TEnv)
 tc _ e (EInt _)                    = (TInt, e)
@@ -266,7 +278,7 @@ eval gs env (EObject fs)  =
 eval gs (Env env) (EVar v)    =
   case M.lookup v env of
     Nothing -> error $ "Could not find " <> show v <> " in env " <> show env
-    Just v' -> return (v', [])
+    Just v' -> return v'
 eval gs env (ELam vs _ e)     = return (VLam env (map fst vs) e, [])
 eval gs env (EApp e es)       =
   do fv <- eval gs env e
@@ -274,7 +286,7 @@ eval gs env (EApp e es)       =
        (lam@(VLam venv vs body), sources) ->
          if length vs == length es
             then do args <- mapM (eval gs env) es
-                    res <- eval gs (extendEnv venv (zip vs (map fst args))) body
+                    res <- eval gs (extendEnv venv (zip vs args)) body
                     return (fst res, snd res <> concatMap snd args <> sources)
             else error $ "Wrong number of arguments to lambda " <> show lam <> ". Expected " <> show vs <> ", got" <> show es <> "."
        l -> error $ "Applying a non-lambda " <> show l <> " to arguments " <> show es
@@ -291,7 +303,7 @@ eval gs env (ECase e n h t s) =
      case fst v of
        VList [] -> do v2 <- eval gs env n
                       return (fst v2, snd v <> snd v2)
-       VList (x:xs) -> do v2 <- eval gs (extendEnv env [(h, x),(t, VList xs)]) s
+       VList (x:xs) -> do v2 <- eval gs (extendEnv env [(h, (x, snd v)),(t, (VList xs, snd v))]) s
                           return (fst v2, snd v <> snd v2)
        _ -> error $ "Non-list in case: " <> show e
 eval gs env (EDot e f) = do v <- eval gs env e
@@ -303,8 +315,8 @@ eval gs env (ELet var e b)    =
   -- very well. It _seems_ plausible, because we are using it to
   -- implement recursion (so anywhere it'll cause divergence,
   -- presumably the looping should have happened).
-  do rec v <- eval gs (extendEnv env [(var, fst v)]) e
-     v' <- eval gs (extendEnv env [(var, fst v)]) b
+  do rec v <- eval gs (extendEnv env [(var, v)]) e
+     v' <- eval gs (extendEnv env [(var, v)]) b
      return (fst v', snd v <> snd v')
 eval gs env (EPrim p es)      =
   do vs' <- mapM (eval gs env) es
@@ -338,7 +350,7 @@ eval gs env (ESource (ES id' t') def)      =
   do existing <- gs id'
      case existing of
        Just (v, t) | t == t' ->
-         return (v, [VSBase id' [] v])
+         return (v, [VSBase id' t [] v])
        _ -> do
          v <- eval gs env def
-         return (fst v, snd v <> [VSBase id' [] (fst v)])
+         return (fst v, snd v <> [VSBase id' t' [] (fst v)])
