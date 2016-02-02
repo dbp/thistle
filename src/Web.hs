@@ -10,18 +10,25 @@ import qualified Blaze.ByteString.Builder as Blaze
 import           Control.Exception        (SomeException, catch)
 import           Control.Lens
 import           Control.Monad            (foldM, void)
+import qualified Data.Aeson               as A
 import           Data.Binary              (decode, encode)
 import qualified Data.ByteString.Lazy     as BL
+import qualified Data.HashMap.Strict      as HM (toList)
+import qualified Data.Map                 as M
 import           Data.Monoid
+import           Data.Scientific          (floatingOrInteger)
 import           Data.Text                (Text)
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as T
 import qualified Data.Text.IO             as T
+import qualified Data.Vector              as V (toList)
 import qualified Database.Redis           as R
 import           Network.Wai              (Response)
 import           System.Directory         (doesFileExist)
 import qualified Text.XmlHtml             as X
 import           Web.Fn
+
+import           Data.Aeson.Helpers
 
 import           Grammar
 import           Lang
@@ -40,11 +47,35 @@ initializer = do
   return (Ctxt defaultFnRequest rconn)
 
 site :: Ctxt -> IO Response
-site ctxt = route ctxt [segment ==> handle]
+site ctxt = route ctxt [segment ==> handleTemplate
+                       ,path "api" /? param "source" /? param "value" /? param "type" ==> handleAPI]
             `fallthrough` notFoundText "Page Not Found."
 
-handle :: Ctxt -> Text -> IO (Maybe Response)
-handle ctxt pth =
+instance FromParam V where
+  fromParam t = case decodeValue (BL.fromStrict $ T.encodeUtf8 t) of
+                  Nothing -> Left ParamUnparsable
+                  Just v -> Right $ jsonToV v
+    where jsonToV j = case j of
+                        A.Number n -> case floatingOrInteger n of
+                                        Left r -> VDouble r
+                                        Right i -> VInt i
+                        A.String s -> VString s
+                        A.Bool b -> VBool b
+                        A.Array a -> VList $ map jsonToV $ V.toList a
+                        A.Object o -> VObject $ M.fromList $ map (\(k,v) -> (k, jsonToV v)) $ HM.toList o
+                        A.Null -> VObject M.empty
+
+instance FromParam T where
+  fromParam s = let EList t _ = parse (lexer (T.unpack $ "[:" <> s <> "]"))
+                in Right t
+
+
+handleAPI :: Ctxt -> Text -> V -> T -> IO (Maybe Response)
+handleAPI ctxt i v t = do redisSetSource (_redis ctxt) (Id i) (v,t)
+                          okText "ok"
+
+handleTemplate :: Ctxt -> Text -> IO (Maybe Response)
+handleTemplate ctxt pth =
   do progtext <- T.readFile "program.thst"
      let prog = parse (lexer (T.unpack (progtext <> " in {}")))
      let !t = tc False emptyTEnv prog
