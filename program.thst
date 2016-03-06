@@ -1,4 +1,9 @@
-x = 10
-y = (z : int) : int { z * 2 }
+a-name = "daniel"
 
-name = source<name;string;"anonymous">
+some-name = source<name;string;"anonymous">
+
+another-name = source<name2;string;"anonymous">
+
+data = source<blah; {number:int}; { number: 10 }>
+
+exclaim = (s : string) : string { s + "!" }

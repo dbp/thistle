@@ -21,6 +21,8 @@ import           Data.Text                 (Text)
 import qualified Data.Text                 as T
 import qualified Data.Text.Encoding        as T
 import qualified Data.Text.IO              as T
+import qualified Data.UUID                 as UUID
+import qualified Data.UUID.V4              as UUID
 import qualified Data.Vector               as V (toList)
 import qualified Database.Redis            as R
 import           Network.HTTP.Types.Header (hReferer)
@@ -49,8 +51,11 @@ initializer = do
   return (Ctxt defaultFnRequest rconn)
 
 site :: Ctxt -> IO Response
-site ctxt = route ctxt [segment ==> handleTemplate
-                       ,path "api" /? param "source" /? param "value" /? param "type" ==> handleAPI]
+site ctxt = route ctxt [end ==> \ctxt -> handleTemplate ctxt "index"
+                       ,segment ==> handleTemplate
+                       ,path "static" ==> staticServe "static"
+                       ,path "api" // param "source" // param "value" // param "type" !=> handleAPI
+                       ]
             `fallthrough` notFoundText "Page Not Found."
 
 instance FromParam V where
@@ -97,7 +102,11 @@ handleTemplate ctxt pth =
              do x <- evalTemplateWithProg (redisSource (view redis ctxt))
                                           progtext
                                           doc
-                let b = X.render (X.HtmlDocument enc typ x)
+                let withThistle = x ++ [X.Element "link" [("rel","stylesheet"),("href","/static/thistle.css")] []
+                                       ,X.Element "script" [("type", "text/javascript"),("src","/static/jquery.js")] []
+                                       ,X.Element "script" [("type", "text/javascript"),("src","/static/thistle.js")] []
+                                       ]
+                let b = X.render (X.HtmlDocument enc typ withThistle)
                 okHtml $ T.decodeUtf8 $ Blaze.toByteString b
            Right _ -> error "renderFile: parseHTML returned XML."
 
@@ -127,8 +136,9 @@ evalTemplateWithProg gs progtext ns =
 evalTemplate :: (Id -> IO (Maybe (V, T))) -> Env -> TEnv -> [X.Node] -> IO [X.Node]
 evalTemplate gs env tenv ns = (\(_,_,x) -> x) <$>
                            (foldM evalNode (env, tenv, []) ns)
-  where renderSource (VSBase (Id t) ty _ v) = X.Element "form" [("action", "/api")]
-                                           [X.Element "textarea" [("name", "value")] [X.TextNode (vToJson v)]
+  where renderSource (VSBase (Id t) ty _ v) = X.Element "form" [("action", "/api"),("method", "POST"),("class", "thistle-form")]
+                                           [X.Element "h4" [] [X.TextNode t]
+                                           ,X.Element "textarea" [("name", "value")] [X.TextNode (vToJson v)]
                                            ,X.Element "input" [("type", "hidden"), ("name", "source"), ("value", t)] []
                                            ,X.Element "input" [("type", "hidden"), ("name", "type"), ("value", renderT ty)] []
                                            ,X.Element "button" [("type", "submit")] [X.TextNode "Submit"]]
@@ -139,8 +149,12 @@ evalTemplate gs env tenv ns = (\(_,_,x) -> x) <$>
                         prog = parse (lexer (T.unpack src))
                         !t = tc False tenv prog
                     (v,sources) <- eval gs env prog
-                    return (env, tenv, ns ++ [X.TextNode (renderV v)
-                                             ,X.Element "div" [("class", "sources")] (map renderSource sources)]))
+                    edid <- UUID.toText <$> UUID.nextRandom
+                    return (env, tenv, ns ++ [X.Element "span" [("class", "thistle-value"), ("data-id", edid)] [X.TextNode (renderV v)]
+                                             ,X.Element "div" [("class", "thistle-sources")
+                                                              ,("data-id", edid)
+                                                              ,("style", "display: none")]
+                                                             (map renderSource sources)]))
                 (\(e ::SomeException) ->
                    return (env, tenv, ns ++ [X.TextNode (T.pack (show e))]))
         evalNode (env,tenv,ns) n@(X.Element t atrs cs) |

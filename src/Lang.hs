@@ -117,7 +117,7 @@ vToJson (VBool True) = "true"
 vToJson (VBool False) = "false"
 vToJson (VString s) = T.pack (show s)
 vToJson (VList vs) = "[" <> T.intercalate ", " (map vToJson vs) <> "]"
-vToJson (VObject m) = "{" <> T.intercalate ", " (map (\(k,v) -> k <> ": " <> vToJson v) $ M.assocs m) <> "}"
+vToJson (VObject m) = "{" <> T.intercalate ", " (map (\(k,v) -> "\"" <> k <> "\": " <> vToJson v) $ M.assocs m) <> "}"
 vToJson (VLam _ as _) = "(" <> T.intercalate ", " (map (\v -> v) as) <> ") { .. }"
 
 

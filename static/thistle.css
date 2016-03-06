@@ -1,0 +1,35 @@
+.thistle-form h4 {
+    margin: 0;
+}
+
+.thistle-value {
+    border: 1px dashed lightskyblue;
+}
+
+.thistle-value:hover {
+    border: 1px solid lightskyblue;
+    cursor: pointer;
+}
+
+.thistle-sources {
+    position: fixed;
+    z-index: 100;
+    width: 80%;
+    height: 80%;
+    top: 10%;
+    left: 10%;
+    background-color: white;
+    padding: 10px;
+    border: 5px solid lightskyblue;
+    border-radius: 10px;
+}
+
+.thistle-bg {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    background-color: rgba(0, 0, 0, 0.6);
+    top: 0;
+    left: 0;
+}
