@@ -54,9 +54,9 @@ site ctxt = route ctxt [segment ==> handleTemplate
             `fallthrough` notFoundText "Page Not Found."
 
 instance FromParam V where
-  fromParam t = case decodeValue (BL.fromStrict $ T.encodeUtf8 t) of
-                  Nothing -> Left ParamUnparsable
-                  Just v -> Right $ jsonToV v
+  fromParam [t] = case decodeValue (BL.fromStrict $ T.encodeUtf8 t) of
+                    Nothing -> Left ParamUnparsable
+                    Just v -> Right $ jsonToV v
     where jsonToV j = case j of
                         A.Number n -> case floatingOrInteger n of
                                         Left r -> VDouble r
@@ -68,8 +68,8 @@ instance FromParam V where
                         A.Null -> VObject M.empty
 
 instance FromParam T where
-  fromParam s = let EList t _ = parse (lexer (T.unpack $ "[:" <> s <> "]"))
-                in Right t
+  fromParam [s] = let EList t _ = parse (lexer (T.unpack $ "[:" <> s <> "]"))
+                  in Right t
 
 
 handleAPI :: Ctxt -> Text -> V -> T -> IO (Maybe Response)

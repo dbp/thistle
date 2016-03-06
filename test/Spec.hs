@@ -38,7 +38,7 @@ main = hspec $ do
            `shouldReturn` (VObject (M.fromList [("k", VInt 2),("l", VInt 3)]), [])
     describe "vars, let, lams, and application" $ do
       it "lookup" $
-        eval noSources (envFromList [("x", VInt 10)]) (EVar ("x"))
+        eval noSources (envFromList [("x", (VInt 10, []))]) (EVar ("x"))
           `shouldReturn` (VInt 10, [])
       it "applying one argument functions" $
         eval noSources emptyEnv (EApp (ELam [("x", TInt)] TInt (EVar ("x"))) [EInt 10])
@@ -47,14 +47,14 @@ main = hspec $ do
         eval noSources emptyEnv (EApp (ELam [("x", TInt), ("y", TInt)] TInt (EVar ("x"))) [EInt 10, EInt 20])
              `shouldReturn` (VInt 10, [])
       it "applying closures" $
-        eval noSources (envFromList [("f", VLam emptyEnv ["x"] (EVar ("x")))])
+        eval noSources (envFromList [("f", (VLam emptyEnv ["x"] (EVar ("x")), []))])
              (EApp (EVar ("f")) [EInt 10])
              `shouldReturn` (VInt 10, [])
       it "let binding" $
         eval noSources emptyEnv (ELet ("x") (EInt 1) (EVar ("x")))
              `shouldReturn` (VInt 1, [])
       it "let shadowing existing vars in env" $
-        eval noSources (envFromList [("x", VInt 10)])
+        eval noSources (envFromList [("x", (VInt 10, []))])
              (ELet ("x") (EInt 1) (EVar ("x")))
              `shouldReturn` (VInt 1, [])
       it "let shadowing let" $
@@ -157,11 +157,11 @@ main = hspec $ do
     describe "sources" $ do
       it "sources should produce their default values" $
         eval noSources emptyEnv (ESource (ES (Id "1") TInt) (EInt 10))
-             `shouldReturn` (VInt 10, [VSBase (Id "1") [] (VInt 10)])
+             `shouldReturn` (VInt 10, [VSBase (Id "1") TInt [] (VInt 10)])
       it "should be able to add sources of ints" $
         eval noSources emptyEnv (EPrim PPlus [EInt 1
                                    ,ESource (ES (Id "1") TInt) (EInt 10)])
-             `shouldReturn` (VInt 11, [VSBase (Id "1") [] (VInt 10)])
+             `shouldReturn` (VInt 11, [VSBase (Id "1") TInt [] (VInt 10)])
   describe "tc" $ do
     let shouldTypeAs e t = fst (tc False emptyTEnv e) `shouldBe` t
     describe "constants" $ do
@@ -447,14 +447,14 @@ main = hspec $ do
   describe "evalTemplate" $ do
     let collapse' (X.Element t as cs) = X.Element t as (collapseText cs)
         collapse' n = n
-        collapseText xs = map (\e -> if length e == 1 then collapse' (head e) else X.TextNode (T.concat (map X.nodeText e))) $ groupBy (\e1 e2 -> X.isTextNode e1 && X.isTextNode e2) xs
+        collapseText xs = map (\e -> if length e == 1 then collapse' (head e) else X.TextNode (T.concat (map X.nodeText e))) $ groupBy (\e1 e2 -> X.isTextNode e1 && X.isTextNode e2) $ filter X.isTextNode xs
         shouldRenderWith tags prog out =
           it (T.unpack tags) $
             let Right (X.HtmlDocument _ _ nodes) =
                   X.parseHTML "" (T.encodeUtf8 tags)
                 Right (X.HtmlDocument _ _ out') =
                   X.parseHTML "" (T.encodeUtf8 out)
-            in collapseText <$> evalTemplateWithProg prog  nodes `shouldReturn` out'
+            in collapseText <$> evalTemplateWithProg noSources prog  nodes `shouldReturn` out'
     shouldRenderWith "<show e='1'/>" "" "1"
     shouldRenderWith "<show e='x'/>" "x = 10" "10"
     shouldRenderWith "<show e='f(10) + 1'/>" "f = (x:int):int { x + 1 }" "12"
@@ -467,9 +467,9 @@ main = hspec $ do
        eval (const (return $ Just (VInt 20, TInt)))
             emptyEnv
             (ESource (ES (Id "1") TInt) (EInt 10))
-             `shouldReturn` (VInt 20, [VSBase (Id "1") [] (VInt 20)])
+             `shouldReturn` (VInt 20, [VSBase (Id "1") TInt [] (VInt 20)])
     it "if type is wrong, should ignore value" $
        eval (const (return $ Just (VInt 20, TInt)))
             emptyEnv
             (ESource (ES (Id "1") TString) (EString "foo"))
-             `shouldReturn` (VString "foo", [VSBase (Id "1") [] (VString "foo")])
+             `shouldReturn` (VString "foo", [VSBase (Id "1") TString [] (VString "foo")])
